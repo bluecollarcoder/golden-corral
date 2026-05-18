@@ -5,18 +5,31 @@ disable-model-invocation: true
 ---
 
 Determine the task file path:
+- Run `git rev-parse --show-toplevel 2>/dev/null` to get the repository root
+- If the command succeeds, use that absolute path as the task root
+- If the command fails (not a git repo), use the current working directory as the task root and state that no git repository root was detected
 - Run `git rev-parse --abbrev-ref HEAD 2>/dev/null` to get the current branch name
-- If the command fails (not a git repo) or returns "HEAD" (detached), the path is `.sdd/TASK.md`
-- Otherwise, sanitize the branch name: strip any prefix up to and including the last `/` (e.g., `feature/my-task` → `my-task`), lowercase all characters, replace any character that is not a letter, digit, or `-` with `-`, collapse consecutive `-` into one, trim leading and trailing `-`; the path is `.sdd/TASK-<sanitized>.md`
+- If the command fails (not a git repo) or returns "HEAD" (detached), the path is `<task-root>/.sdd/TASK.md`
+- Otherwise, sanitize the branch name: strip any prefix up to and including the last `/` (e.g., `feature/my-task` → `my-task`), lowercase all characters, replace any character that is not a letter, digit, or `-` with `-`, collapse consecutive `-` into one, trim leading and trailing `-`; the path is `<task-root>/.sdd/TASK-<sanitized>.md`
 
 Throughout these instructions, "TASK.md" refers to this derived path.
 
 Check whether the task file exists.
 
 If it does not exist:
-- Create the `.sdd/` directory if needed
-- Offer to write TASK.md now using the template below, then tell the human: "TASK.md created at <path>. Add `.sdd/` to your `.gitignore`, fill in the Goal, Non-Goals, Review Focus, and Verification Commands, then run `/sdd-research` again to start the Spec phase research."
-- Do not proceed with research until the human has filled in the Context section.
+- Create the `<task-root>/.sdd/` directory if needed
+- Draft TASK.md from the template below, filling in as much as possible from the current chat context, branch name, visible repository files, and any linked request the human has provided
+- Do not leave a field blank if a reasonable value can be inferred. Mark inferred values plainly, e.g. `Inferred from chat: ...`, when the source may be ambiguous
+- For unknown required fields, write a concise placeholder question directly in the relevant field instead of leaving it empty, e.g. `Question: What should be explicitly out of scope?`
+- Choose a task title and artifact slug from the most specific available context: the human's request first, then linked issue title, then branch name, then `task`
+- Set verification commands to known project commands when they can be discovered quickly from repository metadata such as `package.json`, `pyproject.toml`, `Makefile`, `justfile`, `Cargo.toml`, `go.mod`, or existing CI config. Use `n/a` only when a command is genuinely inapplicable, and use `Question: ...` when the command likely exists but cannot be determined
+- Write the drafted TASK.md immediately; then report "TASK.md created at <path>."
+- After creating TASK.md, continue with a Q&A bootstrap instead of starting research immediately:
+  - Summarize which fields were inferred
+  - Ask the human only the missing or ambiguous questions needed to complete the Context section and any essential verification commands
+  - Number the questions and keep them specific enough to answer inline
+  - Tell the human that after they answer, you will update TASK.md with their answers and then continue the `/sdd-research` flow
+- Do not proceed with research until the Context section has no unresolved `Question:` placeholders.
 
 If Tests or Code phase work appears to be in progress (spec, test files, or implementation changes visible) but TASK.md is absent, stop and tell the human to run `/sdd-research` from the beginning or restore TASK.md from git history.
 

@@ -5,9 +5,12 @@ disable-model-invocation: true
 ---
 
 Determine the task file path:
+- Run `git rev-parse --show-toplevel 2>/dev/null` to get the repository root
+- If the command succeeds, use that absolute path as the task root
+- If the command fails (not a git repo), use the current working directory as the task root and state that no git repository root was detected
 - Run `git rev-parse --abbrev-ref HEAD 2>/dev/null` to get the current branch name
-- If the command fails (not a git repo) or returns "HEAD" (detached), the path is `.sdd/TASK.md`
-- Otherwise, sanitize the branch name: strip any prefix up to and including the last `/` (e.g., `feature/my-task` → `my-task`), lowercase all characters, replace any character that is not a letter, digit, or `-` with `-`, collapse consecutive `-` into one, trim leading and trailing `-`; the path is `.sdd/TASK-<sanitized>.md`
+- If the command fails (not a git repo) or returns "HEAD" (detached), the path is `<task-root>/.sdd/TASK.md`
+- Otherwise, sanitize the branch name: strip any prefix up to and including the last `/` (e.g., `feature/my-task` → `my-task`), lowercase all characters, replace any character that is not a letter, digit, or `-` with `-`, collapse consecutive `-` into one, trim leading and trailing `-`; the path is `<task-root>/.sdd/TASK-<sanitized>.md`
 
 Throughout these instructions, "TASK.md" refers to this derived path.
 
