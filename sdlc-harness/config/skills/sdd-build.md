@@ -16,7 +16,7 @@ Throughout these instructions, "TASK.md" refers to this derived path.
 
 Read TASK.md. If it does not exist, stop and tell the human to run `/sdd-research` first.
 
-Identify the active phase and confirm the Build step is unchecked. Verify Plan for this phase is checked or the human has explicitly said to proceed.
+Identify the active phase and confirm the Build step is unchecked. For the Spec phase, verify Research is checked or the human has explicitly said to proceed. For the Tests or Code phase, verify Plan is checked or the human has explicitly said to proceed.
 
 State what you detected: "Active phase: [X]. Running Build."
 

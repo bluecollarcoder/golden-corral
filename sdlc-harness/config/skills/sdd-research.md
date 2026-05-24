@@ -64,7 +64,6 @@ TASK.md content to write when the file is missing:
 
 ## 1. Spec Phase
 - [ ] Research: Analyze requirements, codebase constraints, dependencies, and risks
-- [ ] Plan: Define behavior, boundaries, interfaces, and acceptance criteria
 - [ ] Build: Create or update the spec in `docs/specs/`
 - [ ] Review: Critic review plus human sign-off
 
@@ -121,6 +120,6 @@ Output a structured research summary with these sections:
 - **Key findings**: the most important things discovered
 - **Constraints**: non-negotiable requirements or existing decisions that bound the solution
 - **Open questions**: things the human or spec must resolve before planning can proceed
-- **Recommended next step**: confirm Research is complete and suggest running `sdd-plan`
+- **Recommended next step**: confirm Research is complete and suggest the appropriate next skill — `sdd-build` for the Spec phase (no planning step), `sdd-plan` for the Tests or Code phase
 
 Ask the human to confirm before marking Research complete in TASK.md. Only check `- [x] Research` if the human approves.

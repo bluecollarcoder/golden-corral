@@ -1,6 +1,6 @@
 ---
 name: sdd-plan
-description: Create the Plan step for the active high-risk SDD phase in TASK.md. Produces a decision-complete proposal for the human to approve before building.
+description: Create the Plan step for the Tests or Code phase in TASK.md. Produces a decision-complete proposal for the human to approve before building. Not used in the Spec phase — run sdd-build directly after sdd-research there.
 disable-model-invocation: true
 ---
 
@@ -16,22 +16,15 @@ Throughout these instructions, "TASK.md" refers to this derived path.
 
 Read TASK.md. If it does not exist, stop and tell the human to run `/sdd-research` first — that skill creates TASK.md when starting a new task.
 
-Identify the active phase and confirm the Plan step is unchecked. Verify Research for this phase is checked or the human has explicitly said to proceed without it.
+Identify the active phase. If the active phase is Spec, stop and tell the human that the Spec phase has no Plan step — run `/sdd-build` directly after research.
+
+Confirm the Plan step is unchecked. Verify Research for this phase is checked or the human has explicitly said to proceed without it.
 
 State what you detected: "Active phase: [X]. Running Plan."
 
 If any user text was passed after `/sdd-plan`, treat it as focus guidance and prioritize those areas in the plan.
 
 Produce a decision-complete plan for the active phase. The plan must leave no important choices open for the builder — every ambiguity the builder might encounter must be resolved here.
-
-**Spec phase plan** — the feature contract:
-- Proposed behavior: precise description of what the system will do after this change
-- Non-goals: explicitly what is out of scope
-- Interfaces and data shapes: function signatures, API shapes, schema changes, event payloads — with types
-- Compatibility: what existing callers, consumers, or data must continue to work unchanged
-- Acceptance criteria: a numbered list of testable conditions that define done (each must be verifiable without reading source code)
-- Edge cases and failure modes: the specific error conditions and expected system responses
-- Test strategy: which behaviors need unit tests, integration tests, or manual verification
 
 **Tests phase plan** — the test layout:
 - List of test files to create or modify, with their purpose
