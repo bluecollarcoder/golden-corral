@@ -41,4 +41,10 @@ Produce a decision-complete plan for the active phase. The plan must leave no im
 
 Keep the plan as short as possible. Cut anything obvious from the code. Include everything the builder will need to make the right call without asking.
 
-Present the plan to the human and ask for approval. Only check `- [x] Plan` in TASK.md after the human approves.
+Present the plan to the human and ask for approval. After the human approves:
+
+1. **Preserve the plan** — write the full plan content to `.sdd/PLAN-<sanitized>.md` (or `.sdd/PLAN.md` if not in a git repo or the branch is detached). This file is committed with the project as a decision record.
+
+2. **Sync the spec if needed** — ask the human: "Did planning reveal any corrections or additions to the spec?" If yes, read the spec path from TASK.md's Artifacts section, apply the confirmed changes, and save the file.
+
+3. **Mark Plan complete** — check `- [x] Plan` in TASK.md.
