@@ -24,7 +24,7 @@ Build the active phase artifact:
 
 **Spec phase** — write the feature contract:
 - Determine the task slug from TASK.md (derive from the task title if not explicit: lowercase, hyphens, no special chars)
-- Create or update `docs/specs/<task-slug>.md` using the structure below
+- Create or update `specs/<task-slug>.md` using the structure below
 - Every section must be filled in — no empty sections
 - Acceptance criteria must be numbered and individually testable
 - When the file is written, read it back and confirm it is coherent and complete

@@ -58,13 +58,13 @@ TASK.md content to write when the file is missing:
 - Build: <!-- e.g. make build -->
 
 ## Artifacts
-- Spec: `docs/specs/<task-slug>.md`
+- Spec: `specs/<task-slug>.md`
 - Test evidence: <!-- filled in during Tests phase Build step -->
 - Final verification evidence: <!-- filled in during Code phase Review step -->
 
 ## 1. Spec Phase
 - [ ] Research: Analyze requirements, codebase constraints, dependencies, and risks
-- [ ] Build: Create or update the spec in `docs/specs/`
+- [ ] Build: Create or update the spec in `specs/`
 - [ ] Review: Critic review plus human sign-off
 
 ## 2. Tests Phase
@@ -102,7 +102,7 @@ Perform read-only research appropriate to the active phase:
 - Note security, compatibility, or rollout concerns
 
 **Tests phase** — map what the approved spec promises to what tests must prove:
-- Read `docs/specs/<task-slug>.md` in full
+- Read `specs/<task-slug>.md` in full
 - Identify every acceptance criterion and classify it as: covered by existing tests, needs a new test, or untestable (explain why)
 - Find existing test files, fixtures, factories, and mocks relevant to the area being changed
 - Determine the test command(s) to run and any setup needed

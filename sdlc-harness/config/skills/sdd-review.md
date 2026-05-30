@@ -25,7 +25,7 @@ State what you detected: "Active phase: [X]. Running Review. Review Focus: [Y or
 **Step 1: Deterministic checks (run before invoking any critic)**
 
 Spec phase:
-- Verify `docs/specs/<task-slug>.md` exists and is non-empty
+- Verify `specs/<task-slug>.md` exists and is non-empty
 - Confirm it contains all required sections: Goal, Non-Goals, Current Behavior, Proposed Behavior, Interfaces and Data, Edge Cases and Failure Modes, Acceptance Criteria, Test Strategy, Compatibility/Rollout/Risks
 - Confirm Acceptance Criteria is a numbered list with at least one item
 - If any check fails, stop and report — do not invoke the critic
@@ -46,7 +46,7 @@ Code phase:
 
 Invoke the appropriate critic agent with the inputs below. Provide them in full — do not summarize or filter.
 
-Spec: invoke `spec-critic` with the original task context from TASK.md, the Review Focus, and the full contents of `docs/specs/<task-slug>.md`.
+Spec: invoke `spec-critic` with the original task context from TASK.md, the Review Focus, and the full contents of `specs/<task-slug>.md`.
 
 Tests: invoke `test-critic` with the full spec file, the Review Focus, and the full contents of all new or changed test files.
 
