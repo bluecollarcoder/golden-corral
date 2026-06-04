@@ -99,7 +99,8 @@ Install targets (Claude-driven; Codex is *called*, not installed into):
 
 `.sdd/TASK-<branch>.md` (or `.sdd/TASK.md` outside a git repo) is the per-task state file.
 Add `.sdd/` to `.gitignore` — it is scaffolding, not a committed artifact. The two plan
-records `.sdd/PLAN-tests.md` and `.sdd/PLAN-code.md` are written for traceability.
+records `.sdd/PLAN-tests-<branch>.md` and `.sdd/PLAN-code-<branch>.md` are written for
+traceability, branch-scoped like the TASK file.
 
 Do not add hooks, MCP servers, plugins, or extra automation until repeated manual use
 proves they are needed.

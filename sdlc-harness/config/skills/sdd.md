@@ -29,14 +29,18 @@ continues from the first incomplete item.
 
 - `git rev-parse --show-toplevel` → repo root (else the working directory; say so).
 - `git rev-parse --abbrev-ref HEAD` → branch. Sanitize: strip up to the last `/`,
-  lowercase, replace non `[a-z0-9-]` with `-`, collapse repeats, trim `-`. Path is
-  `<root>/.sdd/TASK-<branch>.md`. On failure or detached HEAD, use `<root>/.sdd/TASK.md`.
+  lowercase, replace non `[a-z0-9-]` with `-`, collapse repeats, trim `-`. Define the
+  suffix `<branch>` as `-<sanitized>`; on failure or detached HEAD, `<branch>` is empty.
+- The TASK file is `<root>/.sdd/TASK<branch>.md`. Every other per-task `.sdd/` artifact
+  uses the same `<branch>` suffix so parallel branches never collide: `PLAN-tests<branch>.md`,
+  `PLAN-code<branch>.md`, and the scratch files below.
 - Throughout, "TASK file" means this path. Suggest the human add `.sdd/` to `.gitignore`.
 
 ## If the TASK file is missing — scaffold, then stop
 
 Create `.sdd/`, write the TASK file from the template at the end of this skill, filling in
-what you can infer from the chat, branch, and repo. Then run a short Context bootstrap:
+what you can infer from the chat, branch, and repo. Substitute the `<branch>` and
+`<task-slug>` placeholders with their resolved values as you write it. Then run a short Context bootstrap:
 ask only the questions needed to complete the Context and Verification Commands sections
 (numbered, answerable inline). **Do not start the workflow until Context has no unresolved
 `Question:` placeholders.** Once the human answers, update the TASK file and continue.
@@ -69,12 +73,12 @@ to the human at the gate, not auto-fixed.
 the reviewer to look only at what changed plus the still-open findings from the prior
 round — not to re-derive the whole list. Reuse finding ids across rounds for persistence.
 
-**Calling GPT.** Write the prompt to a temp file under `.sdd/` (e.g.
-`.sdd/_codex-prompt.md`), then:
-- Plan review: `~/.claude/sdd/sdd-codex.sh plan-review .sdd/_codex-prompt.md .sdd/_codex-out.json`
-  then read `.sdd/_codex-out.json`.
-- Code authoring: `~/.claude/sdd/sdd-codex.sh build .sdd/_codex-prompt.md .sdd/_codex-msg.md`
-- Applying blocking fixes: `~/.claude/sdd/sdd-codex.sh fix .sdd/_codex-prompt.md .sdd/_codex-msg.md`
+**Calling GPT.** Write the prompt to a branch-scoped scratch file under `.sdd/` (e.g.
+`.sdd/_codex-prompt<branch>.md`), then:
+- Plan review: `~/.claude/sdd/sdd-codex.sh plan-review .sdd/_codex-prompt<branch>.md .sdd/_codex-out<branch>.json`
+  then read `.sdd/_codex-out<branch>.json`.
+- Code authoring: `~/.claude/sdd/sdd-codex.sh build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
+- Applying blocking fixes: `~/.claude/sdd/sdd-codex.sh fix .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
 Each GPT prompt must include the relevant context inline or by file path (spec path, plan,
 the open findings, and exactly which files to write). After a build/fix, read the changed
 files from disk to see what GPT actually did.
@@ -102,7 +106,7 @@ files from disk to see what GPT actually did.
    plan + spec to GPT via `plan-review` (rubric: does the plan cover every acceptance
    criterion, are cases concrete, will the named tests actually fail for the right reason,
    any missing edge/failure cases, any ambiguity left for the builder). Apply blocking
-   findings; carry non-blocking to the gate. Persist the plan to `.sdd/PLAN-tests.md`.
+   findings; carry non-blocking to the gate. Persist the plan to `.sdd/PLAN-tests<branch>.md`.
    Check `Plan`.
 3. **GATE 2.** Present the plan + GPT's non-blocking findings; approve or feedback.
 4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
@@ -124,7 +128,7 @@ files from disk to see what GPT actually did.
    **spec + test code**: file-change sequence, per-file intent at the function level,
    risks, and the verification loop. GPT `plan-review` (rubric: will this make the failing
    tests pass, correctness of approach, missing cases, interface consistency with the
-   tests, decision-completeness). Apply blocking findings; persist to `.sdd/PLAN-code.md`.
+   tests, decision-completeness). Apply blocking findings; persist to `.sdd/PLAN-code<branch>.md`.
    Check `Plan`.
 3. **GATE 4.** Present the plan + non-blocking findings; approve or feedback.
 4. **Build logic** (GPT → you ≤3 rounds). GPT authors the implementation via `build`. Then
@@ -165,8 +169,8 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 
 ## Artifacts
 - Spec: `specs/<task-slug>.md`
-- Test plan: `.sdd/PLAN-tests.md`
-- Code plan: `.sdd/PLAN-code.md`
+- Test plan: `.sdd/PLAN-tests<branch>.md`
+- Code plan: `.sdd/PLAN-code<branch>.md`
 
 ## 1. Spec Phase
 - [ ] Research (Claude + human)
