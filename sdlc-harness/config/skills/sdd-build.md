@@ -29,6 +29,8 @@ Build the active phase artifact:
 - Acceptance criteria must be numbered and individually testable
 - When the file is written, read it back and confirm it is coherent and complete
 
+**Stay in positive scope.** Describe only what the spec covers. Reserve `## Non-Goals` for high-level project scope boundaries that a reader could reasonably assume are included but aren't. Drop trivial negative statements ("we won't touch X", "this doesn't handle Y") entirely — don't put them in `## Non-Goals` and don't scatter them through the other sections.
+
 Spec file structure:
 
 ```
@@ -38,7 +40,7 @@ Spec file structure:
 [One paragraph: what this change accomplishes and why. Close with a sentence that explicitly bounds the scope.]
 
 ## Non-Goals
-[Explicit list of what this spec does NOT cover.]
+[High-level scope boundaries a reader might reasonably assume are included but aren't. Omit trivial exclusions.]
 -
 
 ## Current Behavior

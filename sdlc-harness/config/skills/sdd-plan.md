@@ -41,6 +41,8 @@ Produce a decision-complete plan for the active phase. The plan must leave no im
 
 Keep the plan as short as possible. Cut anything obvious from the code. Include everything the builder will need to make the right call without asking.
 
+**Stay in positive scope.** Describe only what the plan covers. Do not document things you're *not* going to do — negative scope statements ("we won't touch X", "this doesn't handle Y") are redundant noise that bloats the plan without informing the builder.
+
 Present the plan to the human and ask for approval. After the human approves:
 
 1. **Preserve the plan** — write the full plan content to `.sdd/PLAN-<sanitized>.md` (or `.sdd/PLAN.md` if not in a git repo or the branch is detached). This file is committed with the project as a decision record.
