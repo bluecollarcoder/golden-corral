@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_SKILLS_DIR="$HOME/.claude/skills"
 CLAUDE_AGENTS_DIR="$HOME/.claude/agents"
 CLAUDE_SDD_LIB_DIR="$HOME/.claude/sdd"
+CODEX_SKILLS_DIR="$HOME/.codex/skills"
 
 die() {
     echo "ERROR: $1" >&2
@@ -19,16 +20,33 @@ echo "=========================================="
 [ -d "$SCRIPT_DIR/config/agents" ] || die "config/agents/ not found — run install.sh from the repository root"
 [ -d "$SCRIPT_DIR/config/lib" ] || die "config/lib/ not found — run install.sh from the repository root"
 
-mkdir -p "$CLAUDE_SKILLS_DIR" "$CLAUDE_AGENTS_DIR" "$CLAUDE_SDD_LIB_DIR"
+mkdir -p "$CLAUDE_SKILLS_DIR" "$CLAUDE_AGENTS_DIR" "$CLAUDE_SDD_LIB_DIR" "$CODEX_SKILLS_DIR"
 
-# Orchestrator skill — Claude only. It drives the workflow and reaches GPT through the
-# codex wrapper, so no Codex-side skill install is needed.
+# Skills. The full orchestrator is Claude-only; the spec-only skill is shared so either
+# harness can produce the Gate 1 handoff artifact.
 for skill_file in "$SCRIPT_DIR/config/skills/"*.md; do
     [ -f "$skill_file" ] || continue
     skill_name="$(basename "$skill_file" .md)"
-    mkdir -p "$CLAUDE_SKILLS_DIR/$skill_name"
-    cp "$skill_file" "$CLAUDE_SKILLS_DIR/$skill_name/SKILL.md"
-    echo "  skill: $skill_name"
+
+    case "$skill_name" in
+        sdd)
+            mkdir -p "$CLAUDE_SKILLS_DIR/$skill_name"
+            cp "$skill_file" "$CLAUDE_SKILLS_DIR/$skill_name/SKILL.md"
+            echo "  claude skill: $skill_name"
+            ;;
+        sdd-spec)
+            mkdir -p "$CLAUDE_SKILLS_DIR/$skill_name" "$CODEX_SKILLS_DIR/$skill_name"
+            cp "$skill_file" "$CLAUDE_SKILLS_DIR/$skill_name/SKILL.md"
+            cp "$skill_file" "$CODEX_SKILLS_DIR/$skill_name/SKILL.md"
+            echo "  claude skill: $skill_name"
+            echo "  codex skill : $skill_name"
+            ;;
+        *)
+            mkdir -p "$CLAUDE_SKILLS_DIR/$skill_name"
+            cp "$skill_file" "$CLAUDE_SKILLS_DIR/$skill_name/SKILL.md"
+            echo "  claude skill: $skill_name"
+            ;;
+    esac
 done
 
 # Cross-model wrapper + findings schema. The skill invokes the wrapper from here.
@@ -69,8 +87,10 @@ echo ""
 echo "Installed to:"
 printf "  Claude skills : %s\n" "$CLAUDE_SKILLS_DIR"
 printf "  Claude agents : %s\n" "$CLAUDE_AGENTS_DIR"
+printf "  Codex skills  : %s\n" "$CODEX_SKILLS_DIR"
 printf "  SDD lib       : %s\n" "$CLAUDE_SDD_LIB_DIR"
 echo ""
 echo "Requires the codex CLI on PATH and logged in (codex login status)."
-echo "Next: run /sdd in your workspace to scaffold .sdd/TASK and start the Spec phase."
+echo "Next: run /sdd in Claude for the full flow, or sdd-spec in Claude/Codex for Spec only."
+echo "After Gate 1 from sdd-spec, resume Tests and Code in Claude with /sdd."
 echo "=========================================="

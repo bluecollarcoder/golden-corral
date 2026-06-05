@@ -1,19 +1,20 @@
 ---
 name: sdd
-description: Run the full Spec-Driven Development workflow for high-risk work end to end. Start it once; it drives Spec -> Tests -> Code, pausing only at the 5 human approval gates, and resumes from .sdd/TASK state on re-invocation. Claude authors and orchestrates; GPT (via the codex CLI) is the cross-model author/critic.
+description: Run the full Claude-only Spec-Driven Development workflow for high-risk work end to end after or including the Spec phase. It drives Spec -> Tests -> Code, pausing only at the 5 human approval gates, and resumes from .sdd/TASK state on re-invocation. Spec may be authored by Claude or Codex via sdd-spec; Tests and Code are orchestrated only by Claude, with GPT reached through the codex CLI.
 disable-model-invocation: true
 ---
 
-You are the orchestrator for a high-risk Spec-Driven Development task. The human starts
-this skill once. You drive the whole workflow and **stop only at the 5 human gates**. You
-are resumable: all progress lives in the TASK file, so a fresh session re-reads it and
-continues from the first incomplete item.
+You are the Claude-only orchestrator for a high-risk Spec-Driven Development task. The
+human starts this skill once, or resumes it after `sdd-spec` completed Gate 1 in Claude or
+Codex. You drive the workflow through Tests and Code and **stop only at the 5 human
+gates**. You are resumable: all progress lives in the TASK file, so a fresh session
+re-reads it and continues from the first incomplete item.
 
 ## Roles (the critic is always the non-author model)
 
 | Artifact | Author | AI critic |
 |----------|--------|-----------|
-| Spec | you (Claude) | — (human only) |
+| Spec | Claude or Codex through `sdd-spec`; you may also author it here | — (human only) |
 | Test plan | you (Claude) | GPT, 1 round |
 | Test code | GPT | you (Claude), ≤3 rounds |
 | Code plan | you (Claude) | GPT, 1 round |
@@ -24,6 +25,9 @@ continues from the first incomplete item.
   phase) subagents.
 - You never let GPT review its own code and never review your own plan — that defeats the
   cross-model check.
+- Tests Phase and Code Phase are Claude-only orchestration. If this prompt is somehow run
+  from Codex, stop before any Tests or Code item and tell the human to resume in Claude
+  Code with `/sdd`.
 
 ## Resolve the TASK file
 
@@ -97,7 +101,14 @@ files from disk to see what GPT actually did.
    upstream (covered by their tests); the **level** for each (unit / integration /
    acceptance); rough **sizing** per level; and any **specific failure mode that justifies a
    high-fidelity fixture or mock** — defaulting otherwise to the simplest good-enough stub.
-   Read it back for coherence. Check `Build`.
+   While writing, keep the acceptance criteria and test strategy essential and economical:
+   every criterion maps to user-visible or contract-level behavior from the spec; no
+   criterion tests implementation details, incidental sequencing, or upstream-owned
+   behavior; criteria are individually testable and non-overlapping; the test strategy
+   covers the implied failure modes without duplicate cases; coverage is pushed to the
+   cheapest level that catches each failure; high-fidelity fixtures are used only when a
+   named failure mode requires them; and nice-to-have, exploratory, or defensive breadth is
+   moved to risks/notes or dropped. Read it back for coherence. Check `Build`.
 3. **GATE 1.** Present the spec and ask the human to approve or give feedback. On approval,
    check the gate. On feedback, revise the spec and re-present (no AI critic in this phase).
 
@@ -202,19 +213,19 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 - Code plan: `.sdd/PLAN-code<branch>.md`
 
 ## 1. Spec Phase
-- [ ] Research (Claude + human)
-- [ ] Build spec (Claude -> specs/<slug>.md)
+- [ ] Research (Claude or Codex + human)
+- [ ] Build spec (Claude or Codex -> specs/<slug>.md)
 - [ ] GATE 1: human approves spec
 
 ## 2. Tests Phase
-- [ ] Research (Claude, from spec)
+- [ ] Research (Claude only, from spec)
 - [ ] Plan test code (Claude draft -> GPT review 1x -> edit)
 - [ ] GATE 2: human approves test plan
 - [ ] Build test code (GPT author -> Claude review <=3x -> GPT fix; new tests fail for the right reason)
 - [ ] GATE 3: human approves test code
 
 ## 3. Code Phase
-- [ ] Research (Claude, from spec + test code)
+- [ ] Research (Claude only, from spec + test code)
 - [ ] Plan logic (Claude draft -> GPT review 1x -> edit)
 - [ ] GATE 4: human approves code plan
 - [ ] Build logic (GPT author -> Claude review <=3x -> GPT fix; full verification, tests must pass)
