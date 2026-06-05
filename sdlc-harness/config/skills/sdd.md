@@ -92,25 +92,54 @@ files from disk to see what GPT actually did.
    findings | Constraints | Open questions. Check `Research`.
 2. **Build spec** (you). Derive the slug from the task title. Write `specs/<slug>.md`
    using the Spec structure at the end of this skill — every section filled, acceptance
-   criteria numbered and individually testable. Read it back for coherence. Check `Build`.
+   criteria numbered and individually testable. The `Test Strategy` section is a real
+   rubric, not a sentence: name the **failure modes** to catch and which are owned here vs.
+   upstream (covered by their tests); the **level** for each (unit / integration /
+   acceptance); rough **sizing** per level; and any **specific failure mode that justifies a
+   high-fidelity fixture or mock** — defaulting otherwise to the simplest good-enough stub.
+   Read it back for coherence. Check `Build`.
 3. **GATE 1.** Present the spec and ask the human to approve or give feedback. On approval,
    check the gate. On feedback, revise the spec and re-present (no AI critic in this phase).
 
 ### Tests phase
-1. **Research** (you). Read the approved spec. Classify each acceptance criterion:
-   covered / needs-new-test / untestable (say why). Find fixtures, factories, mocks.
+1. **Research** (you). Read the approved spec and its Test Strategy. For each acceptance
+   criterion, identify its **failure modes**, the **unit under test** and its collaborators,
+   whether the behavior is **owned here or upstream**, and the intended **level** (unit /
+   integration / acceptance). Upstream-owned behavior is covered by its own tests — here you
+   cover only this component's interaction with it. Classify each criterion: covered /
+   needs-new-test / untestable (say why). Search for **existing tests covering the same
+   unit/area** and note which could be extended (an added assertion or a parametrized case)
+   versus where a new test is warranted; also find reusable fixtures, factories, mocks.
    Confirm the test command and what a meaningful failure looks like. Check `Research`.
 2. **Plan test code** (you → GPT 1 round). Draft a decision-complete plan covering **test
-   code only**: files to create, cases per criterion (name/input/expected/criterion),
-   fixtures and mocks, the exact test command, and the expected failure shape. Send the
-   plan + spec to GPT via `plan-review` (rubric: does the plan cover every acceptance
-   criterion, are cases concrete, will the named tests actually fail for the right reason,
-   any missing edge/failure cases, any ambiguity left for the builder). Apply blocking
-   findings; carry non-blocking to the gate. Persist the plan to `.sdd/PLAN-tests<branch>.md`.
-   Check `Plan`.
+   code only**. For each case: the **failure mode** it catches, its **level**, the simplest
+   mechanism that catches it (default to a plain stub/mock — call out and justify by failure
+   mode any case that needs a high-fidelity recorded fixture), and an **assertion that binds
+   to the specific owned behavior** (no loose "some error" assertions). Pick a deliberate
+   case count — enough to cover the failure and its key boundaries, not redundant breadth.
+   Be economical: each case must catch a failure mode not already covered; group several
+   facets of one exercised call into a single test; plan a shared scoped fixture to run
+   expensive integration/E2E setup once and reuse it (read-only, keeping distinct failure
+   modes separate). **Reuse-vs-new:** extend an existing test when the check is another facet
+   of the call/behavior it already exercises, or the same failure mode with a different input
+   (parametrized case) sharing its setup; create a new test when the check targets a distinct
+   failure mode, needs different setup or level, or extending would mix unrelated behaviors —
+   never bolt an out-of-scope assertion onto an existing test.
+   Include the exact test command and the expected failure shape. Send the plan + spec to
+   GPT via `plan-review` (rubric: does each owned failure mode have a test at the right
+   level; are cases concrete; will the named tests fail for the right reason; does anything
+   re-test upstream-owned behavior, use needless fidelity, or duplicate an existing test it
+   should extend; any ambiguity for the builder).
+   Apply blocking findings; carry non-blocking to the gate. Persist the plan to
+   `.sdd/PLAN-tests<branch>.md`. Check `Plan`.
 3. **GATE 2.** Present the plan + GPT's non-blocking findings; approve or feedback.
 4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
-   (prompt = spec + approved plan + exact files to write). Then loop: run the test command
+   (prompt = spec + approved plan + exact files to write). Instruct GPT to follow the plan's
+   level and mechanism per case: favor simple, maintainable, economical tests; reuse existing
+   tests/fixtures/helpers as the plan specifies; stub/mock collaborators to create the
+   condition (or load a high-fidelity fixture only where the plan justified one); keep each
+   test at its chosen level and within the task's ownership boundary. Then loop:
+   run the test command
    (deterministic check — the important new tests must **fail for the behavioral reason**,
    not infra; a premature pass is itself a blocking finding); invoke `test-critic` with the
    spec + test files as a review round; if blocking findings remain, have GPT `fix` them
@@ -227,7 +256,11 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 1.
 
 ## Test Strategy
-[Which criteria need unit/integration tests; what can't be tested automatically and why.]
+[Per failure mode: what failure are we catching, and is the behavior owned here or upstream
+(re-test only what we own). Level: unit / integration / acceptance, pushing volume to the
+cheapest level that catches it. Sizing: rough case count per level. Fidelity: default to the
+simplest good-enough stub/mock; name any specific failure mode that justifies a high-fidelity
+recorded fixture. Note anything that can't be tested automatically and why.]
 
 ## Compatibility, Rollout, and Risks
 [Migrations, versioning, flags, ordering, downstream impact, rollback, known unknowns.]
