@@ -2,7 +2,7 @@
 <!-- One paragraph: what changed and why. -->
 
 ## Spec and Task
-- Spec: `specs/<task-slug>.md`
+- Spec: `specs/<module>/<task-slug>.md`
 - Task checklist: `TASK.md`
 
 ## Verification

@@ -26,8 +26,9 @@ to work safely while keeping the human in control at a few decisive moments.
 - **Start once, stop at the gates:** the full Claude skill drives the whole flow and pauses
   only at the 5 human approval gates. The shared spec skill stops after Gate 1.
 
-A spec here is a short feature contract stored as `specs/<task-slug>.md` — goal,
-non-goals, behavior, interfaces, edge cases, acceptance criteria, test strategy.
+A spec here is a short feature contract stored as
+`<repo-root>/specs/<module>/<task-slug>.md` — goal, non-goals, behavior, interfaces, edge
+cases, acceptance criteria, test strategy.
 
 ---
 
@@ -35,8 +36,8 @@ non-goals, behavior, interfaces, edge cases, acceptance criteria, test strategy.
 
 The full workflow is the Claude-only skill `sdd`. The spec-only workflow is the shared
 skill `sdd-spec`, installed in both Claude and Codex. Both use the same `.sdd/TASK` state
-and `specs/<task-slug>.md` artifact, so a spec started in Codex can hand off cleanly to
-Claude for Tests and Code.
+and `specs/<module>/<task-slug>.md` artifact, so a spec started in Codex can hand off
+cleanly to Claude for Tests and Code.
 
 The critic is always the non-author model:
 
@@ -157,6 +158,7 @@ left off. You will be asked to approve exactly five times: the spec, the test pl
 test code, the code plan, and the logic code.
 
 For spec-only work in Claude or Codex, invoke the `sdd-spec` skill. It scaffolds or resumes
-the same `.sdd/TASK-<branch>.md`, writes `specs/<task-slug>.md`, stops at Gate 1, and does
-not start Tests or Code. After approving Gate 1, switch to Claude Code and run `/sdd` to
-resume at the Tests phase.
+the same `.sdd/TASK-<branch>.md`, writes
+`<repo-root>/specs/<module>/<task-slug>.md`, stops at Gate 1, and does not start Tests or
+Code. After approving Gate 1, switch to Claude Code and run `/sdd` to resume at the Tests
+phase.

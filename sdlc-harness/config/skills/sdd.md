@@ -38,6 +38,9 @@ re-reads it and continues from the first incomplete item.
 - The TASK file is `<root>/.sdd/TASK<branch>.md`. Every other per-task `.sdd/` artifact
   uses the same `<branch>` suffix so parallel branches never collide: `PLAN-tests<branch>.md`,
   `PLAN-code<branch>.md`, and the scratch files below.
+- The spec file is always `<root>/specs/<module>/<task-slug>.md`; pick the existing
+  `specs/` subfolder that matches the affected area, or create the obvious domain folder.
+  Never write the spec relative to the current working directory.
 - Throughout, "TASK file" means this path. Suggest the human add `.sdd/` to `.gitignore`.
 
 ## If the TASK file is missing — scaffold, then stop
@@ -94,8 +97,10 @@ files from disk to see what GPT actually did.
    schemas, configs, and downstream dependencies. Note prior decisions, risks, and open
    questions. Collaborate with the human to resolve intent. Output: Detected state | Key
    findings | Constraints | Open questions. Check `Research`.
-2. **Build spec** (you). Derive the slug from the task title. Write `specs/<slug>.md`
-   using the Spec structure at the end of this skill — every section filled, acceptance
+2. **Build spec** (you). Choose the `specs/<module>/` folder from the affected area and
+   derive the slug from the task title. Create `<root>/specs/<module>/` if needed and
+   write `<root>/specs/<module>/<slug>.md` using the Spec structure at the end of this
+   skill — every section filled, acceptance
    criteria numbered and individually testable. The `Test Strategy` section is a real
    rubric, not a sentence: name the **failure modes** to catch and which are owned here vs.
    upstream (covered by their tests); the **level** for each (unit / integration /
@@ -208,13 +213,13 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 - Build:
 
 ## Artifacts
-- Spec: `specs/<task-slug>.md`
+- Spec: `specs/<module>/<task-slug>.md`
 - Test plan: `.sdd/PLAN-tests<branch>.md`
 - Code plan: `.sdd/PLAN-code<branch>.md`
 
 ## 1. Spec Phase
 - [ ] Research (Claude or Codex + human)
-- [ ] Build spec (Claude or Codex -> specs/<slug>.md)
+- [ ] Build spec (Claude or Codex -> specs/<module>/<slug>.md at repo root)
 - [ ] GATE 1: human approves spec
 
 ## 2. Tests Phase
@@ -239,7 +244,7 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 - Logic code approved by:
 ```
 
-## Spec structure (write this to `specs/<slug>.md`)
+## Spec structure (write this to `<root>/specs/<module>/<slug>.md`)
 
 ```markdown
 # Spec: [Feature Name]

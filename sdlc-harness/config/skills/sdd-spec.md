@@ -1,6 +1,6 @@
 ---
 name: sdd-spec
-description: Run only the Spec phase of the SDD workflow in Claude or Codex. It scaffolds/resumes .sdd/TASK state, writes specs/<slug>.md, stops at Gate 1, and hands Tests and Code phases back to Claude's full /sdd workflow.
+description: Run only the Spec phase of the SDD workflow in Claude or Codex. It scaffolds/resumes .sdd/TASK state, writes specs/<module>/<slug>.md at the repo root, stops at Gate 1, and hands Tests and Code phases back to Claude's full /sdd workflow.
 ---
 
 You run only the Spec phase of a high-risk Spec-Driven Development task. This skill may
@@ -10,7 +10,7 @@ run in Claude or Codex. It writes the same TASK and spec artifacts used by the f
 ## Boundary
 
 - You may do Spec Phase work only: scaffold TASK state, research, collaborate on intent,
-  write or revise `specs/<slug>.md`, and handle Gate 1 approval.
+  write or revise `<root>/specs/<module>/<slug>.md`, and handle Gate 1 approval.
 - You must not start Tests Phase or Code Phase work.
 - If the TASK file's first unchecked item is after `GATE 1: human approves spec`, stop and
   tell the human to resume in Claude Code with `/sdd`.
@@ -26,6 +26,9 @@ run in Claude or Codex. It writes the same TASK and spec artifacts used by the f
   suffix `<branch>` as `-<sanitized>`; on failure or detached HEAD, `<branch>` is empty.
 - The TASK file is `<root>/.sdd/TASK<branch>.md`. Every per-task `.sdd/` artifact uses the
   same `<branch>` suffix so parallel branches never collide.
+- The spec file is always `<root>/specs/<module>/<task-slug>.md`; pick the existing
+  `specs/` subfolder that matches the affected area, or create the obvious domain folder.
+  Never write the spec relative to the current working directory.
 - Throughout, "TASK file" means this path. Suggest the human add `.sdd/` to `.gitignore`.
 
 ## If the TASK file is missing - scaffold, then stop
@@ -53,8 +56,10 @@ once the step's output exists.
    schemas, configs, and downstream dependencies. Note prior decisions, risks, and open
    questions. Collaborate with the human to resolve intent. Output: Detected state | Key
    findings | Constraints | Open questions. Check `Research`.
-2. **Build spec** (you). Derive the slug from the task title. Write `specs/<slug>.md`
-   using the Spec structure at the end of this skill, with every section filled and
+2. **Build spec** (you). Choose the `specs/<module>/` folder from the affected area and
+   derive the slug from the task title. Create `<root>/specs/<module>/` if needed and
+   write `<root>/specs/<module>/<slug>.md` using the Spec structure at the end of this
+   skill, with every section filled and
    acceptance criteria numbered and individually testable. The `Test Strategy` section is a
    real rubric, not a sentence: name failure modes, ownership here vs upstream, test level
    for each (unit / integration / acceptance), rough sizing per level, and any specific
@@ -98,13 +103,13 @@ readiness assessment. Ask the human to approve or give feedback, and stop.
 - Build:
 
 ## Artifacts
-- Spec: `specs/<task-slug>.md`
+- Spec: `specs/<module>/<task-slug>.md`
 - Test plan: `.sdd/PLAN-tests<branch>.md`
 - Code plan: `.sdd/PLAN-code<branch>.md`
 
 ## 1. Spec Phase
 - [ ] Research (Claude or Codex + human)
-- [ ] Build spec (Claude or Codex -> specs/<slug>.md)
+- [ ] Build spec (Claude or Codex -> specs/<module>/<slug>.md at repo root)
 - [ ] GATE 1: human approves spec
 
 ## 2. Tests Phase
@@ -129,7 +134,7 @@ readiness assessment. Ask the human to approve or give feedback, and stop.
 - Logic code approved by:
 ```
 
-## Spec structure (write this to `specs/<slug>.md`)
+## Spec structure (write this to `<root>/specs/<module>/<slug>.md`)
 
 ```markdown
 # Spec: [Feature Name]
