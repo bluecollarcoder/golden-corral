@@ -114,14 +114,14 @@ readiness assessment. Ask the human to approve or give feedback, and stop.
 
 ## 2. Tests Phase
 - [ ] Research (Claude only, from spec)
-- [ ] Plan test code (Claude draft -> GPT review 1x -> edit)
+- [ ] Plan test code (GPT author -> Claude plan-critic 1x -> GPT fix)
 - [ ] GATE 2: human approves test plan
 - [ ] Build test code (GPT author -> Claude review <=3x -> GPT fix; new tests fail for the right reason)
 - [ ] GATE 3: human approves test code
 
 ## 3. Code Phase
 - [ ] Research (Claude only, from spec + test code)
-- [ ] Plan logic (Claude draft -> GPT review 1x -> edit)
+- [ ] Plan logic (GPT author -> Claude plan-critic 1x -> GPT fix)
 - [ ] GATE 4: human approves code plan
 - [ ] Build logic (GPT author -> Claude review <=3x -> GPT fix; full verification, tests must pass)
 - [ ] GATE 5: human approves logic code

@@ -20,7 +20,8 @@ to work safely while keeping the human in control at a few decisive moments.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
 - **Cross-model review:** the model that authors an artifact is never the model that
-  reviews it. Claude drives Tests and Code; GPT is reached through the `codex` CLI.
+  reviews it. Claude orchestrates and reviews; GPT authors plans, tests, and code through
+  the `codex` CLI.
 - **Deterministic checks before critique:** run tests, linters, type checks, or builds
   before asking a model to review.
 - **Start once, stop at the gates:** the full Claude skill drives the whole flow and pauses
@@ -44,15 +45,15 @@ The critic is always the non-author model:
 | Phase | Author | AI critic | Human gate |
 |-------|--------|-----------|------------|
 | Spec | Claude or Codex | — | **1. Spec approved** |
-| Test plan | Claude | GPT (1 round) | **2. Test plan approved** |
+| Test plan | GPT | Claude (1 round) | **2. Test plan approved** |
 | Test code | GPT | Claude (≤3 rounds) | **3. Test code approved** |
-| Code plan | Claude | GPT (1 round) | **4. Code plan approved** |
+| Code plan | GPT | Claude (1 round) | **4. Code plan approved** |
 | Logic code | GPT | Claude (≤3 rounds) | **5. Logic code approved** |
 
 - **Claude → GPT** handoffs go through `config/lib/sdd-codex.sh` (a thin `codex exec`
   wrapper), so the human no longer relays messages between models.
-- **Claude reviews GPT's code** with the `test-critic` and `code-critic` subagents.
-- **GPT reviews Claude's plans** read-only, returning structured findings.
+- **Claude reviews GPT's plans and code** with the `plan-critic`, `test-critic`, and
+  `code-critic` subagents.
 - **Codex spec mode** never plans or writes tests/code. After Gate 1 approval, resume in
   Claude Code with `/sdd`.
 
@@ -82,11 +83,12 @@ Claude Code and Codex expect.
 │   │   ├── sdd.md                 # Claude-only full orchestrator skill
 │   │   └── sdd-spec.md            # shared Claude/Codex spec-only skill
 │   ├── agents/
+│   │   ├── plan-critic.md         # plan critic prompt body
 │   │   ├── test-critic.md         # shared critic prompt bodies
 │   │   └── code-critic.md
 │   └── lib/
-│       ├── sdd-codex.sh           # codex exec wrapper (plan-review | build | fix)
-│       └── findings.schema.json   # structured-findings schema for GPT reviews
+│       ├── sdd-codex.sh           # codex exec wrapper (build | fix; plan-review remains available)
+│       └── findings.schema.json   # schema for the optional plan-review wrapper mode
 ├── templates/
 │   └── PULL_REQUEST_TEMPLATE.md
 └── install.sh
@@ -118,14 +120,12 @@ proves they are needed.
 
 Shared prompt bodies; `install.sh` adds the Claude subagent frontmatter.
 
+- **`plan-critic.md`** — decision-completeness, scope, coverage, and economy for
+  GPT-authored test/code plans.
 - **`test-critic.md`** — criterion coverage, failure quality (tests must fail for the right
   reason before code exists), boundary coverage, mock fidelity.
 - **`code-critic.md`** — correctness, security, reliability, maintainability, and whether
   the verification output supports the claimed readiness.
-
-GPT's plan reviews use a plan-specific rubric supplied by the orchestrator (does the plan
-cover every acceptance criterion, are cases concrete, is anything left ambiguous for the
-builder) and return JSON matching `config/lib/findings.schema.json`.
 
 ---
 

@@ -15,16 +15,15 @@ re-reads it and continues from the first incomplete item.
 | Artifact | Author | AI critic |
 |----------|--------|-----------|
 | Spec | Claude or Codex through `sdd-spec`; you may also author it here | — (human only) |
-| Test plan | you (Claude) | GPT, 1 round |
+| Test plan | GPT | you (Claude), 1 round via `plan-critic` |
 | Test code | GPT | you (Claude), ≤3 rounds |
-| Code plan | you (Claude) | GPT, 1 round |
+| Code plan | GPT | you (Claude), 1 round via `plan-critic` |
 | Logic code | GPT | you (Claude), ≤3 rounds |
 
 - You reach **GPT** through the wrapper `~/.claude/sdd/sdd-codex.sh` (it calls `codex exec`).
-- You review **GPT's code** with the `test-critic` (Tests phase) and `code-critic` (Code
-  phase) subagents.
-- You never let GPT review its own code and never review your own plan — that defeats the
-  cross-model check.
+- You review **GPT's plans** with the `plan-critic` subagent, **GPT's tests** with the
+  `test-critic` subagent, and **GPT's implementation** with the `code-critic` subagent.
+- You never let an author review its own artifact — that defeats the cross-model check.
 - Tests Phase and Code Phase are Claude-only orchestration. If this prompt is somehow run
   from Codex, stop before any Tests or Code item and tell the human to resume in Claude
   Code with `/sdd`.
@@ -65,10 +64,8 @@ once the step's output exists.
 
 ## Shared loop mechanics
 
-**Findings format.** Every AI review (GPT plan review and your code review) produces:
-`verdict: PASS|FAIL` and a list of findings, each `{id, blocking, location, description,
-suggested_fix}`. GPT emits this as JSON (the wrapper enforces the schema). You emit the
-same shape from the critic subagent output.
+**Findings format.** Every AI review produces `PASS|FAIL` and findings split into
+blocking and non-blocking. Critic subagents use their prompt-specific text format.
 
 **Blocking gate = "good enough".** A review round ends the loop early the moment it returns
 **zero blocking findings**. Otherwise the loop continues up to its cap (1 round for plans,
@@ -82,13 +79,12 @@ round — not to re-derive the whole list. Reuse finding ids across rounds for p
 
 **Calling GPT.** Write the prompt to a branch-scoped scratch file under `.sdd/` (e.g.
 `.sdd/_codex-prompt<branch>.md`), then:
-- Plan review: `~/.claude/sdd/sdd-codex.sh plan-review .sdd/_codex-prompt<branch>.md .sdd/_codex-out<branch>.json`
-  then read `.sdd/_codex-out<branch>.json`.
-- Code authoring: `~/.claude/sdd/sdd-codex.sh build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
+- Plan, test, or code authoring: `~/.claude/sdd/sdd-codex.sh build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
 - Applying blocking fixes: `~/.claude/sdd/sdd-codex.sh fix .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
 Each GPT prompt must include the relevant context inline or by file path (spec path, plan,
-the open findings, and exactly which files to write). After a build/fix, read the changed
-files from disk to see what GPT actually did.
+the open findings, and exactly which files to write). For plans, tell GPT to write the
+exact `.sdd/PLAN-*<branch>.md` file. After a build/fix, read the changed files from disk
+to see what GPT actually did.
 
 ## The phases
 
@@ -127,28 +123,17 @@ files from disk to see what GPT actually did.
    unit/area** and note which could be extended (an added assertion or a parametrized case)
    versus where a new test is warranted; also find reusable fixtures, factories, mocks.
    Confirm the test command and what a meaningful failure looks like. Check `Research`.
-2. **Plan test code** (you → GPT 1 round). Draft a decision-complete plan covering **test
-   code only**. For each case: the **failure mode** it catches, its **level**, the simplest
-   mechanism that catches it (default to a plain stub/mock — call out and justify by failure
-   mode any case that needs a high-fidelity recorded fixture), and an **assertion that binds
-   to the specific owned behavior** (no loose "some error" assertions). Pick a deliberate
-   case count — enough to cover the failure and its key boundaries, not redundant breadth.
-   Be economical: each case must catch a failure mode not already covered; group several
-   facets of one exercised call into a single test; plan a shared scoped fixture to run
-   expensive integration/E2E setup once and reuse it (read-only, keeping distinct failure
-   modes separate). **Reuse-vs-new:** extend an existing test when the check is another facet
-   of the call/behavior it already exercises, or the same failure mode with a different input
-   (parametrized case) sharing its setup; create a new test when the check targets a distinct
-   failure mode, needs different setup or level, or extending would mix unrelated behaviors —
-   never bolt an out-of-scope assertion onto an existing test.
-   Include the exact test command and the expected failure shape. Send the plan + spec to
-   GPT via `plan-review` (rubric: does each owned failure mode have a test at the right
-   level; are cases concrete; will the named tests fail for the right reason; does anything
-   re-test upstream-owned behavior, use needless fidelity, or duplicate an existing test it
-   should extend; any ambiguity for the builder).
-   Apply blocking findings; carry non-blocking to the gate. Persist the plan to
-   `.sdd/PLAN-tests<branch>.md`. Check `Plan`.
-3. **GATE 2.** Present the plan + GPT's non-blocking findings; approve or feedback.
+2. **Plan test code** (GPT → you 1 round). Prompt GPT via `build` to author a
+   decision-complete **test-code-only** plan and write it to `.sdd/PLAN-tests<branch>.md`.
+   The prompt must include the approved spec, your research notes, reusable tests/fixtures,
+   the exact test command, and the expected failure shape. Require the plan to cover, for
+   each case: the failure mode it catches, its level, the simplest mechanism that catches it
+   (plain stub/mock by default; high-fidelity fixture only when justified by a named failure
+   mode), and an assertion that binds to owned behavior. Require economical case count,
+   reuse-vs-new choices, and no upstream re-testing. Read the plan from disk, invoke
+   `plan-critic` in test-plan mode, then have GPT fix blocking findings once if needed.
+   Carry non-blocking findings to the gate. Check `Plan`.
+3. **GATE 2.** Present the plan + `plan-critic` non-blocking findings; approve or feedback.
 4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
    (prompt = spec + approved plan + exact files to write). Instruct GPT to follow the plan's
    level and mechanism per case: favor simple, maintainable, economical tests; reuse existing
@@ -169,13 +154,15 @@ files from disk to see what GPT actually did.
 1. **Research** (you). From the spec + the test code: identify implementation targets,
    local patterns, import styles, reusable utilities, and the verification loop order
    (test → lint → typecheck → build). Check `Research`.
-2. **Plan logic** (you → GPT 1 round). Draft a decision-complete implementation plan from
-   **spec + test code**: file-change sequence, per-file intent at the function level,
-   risks, and the verification loop. GPT `plan-review` (rubric: will this make the failing
-   tests pass, correctness of approach, missing cases, interface consistency with the
-   tests, decision-completeness). Apply blocking findings; persist to `.sdd/PLAN-code<branch>.md`.
-   Check `Plan`.
-3. **GATE 4.** Present the plan + non-blocking findings; approve or feedback.
+2. **Plan logic** (GPT → you 1 round). Prompt GPT via `build` to author a
+   decision-complete implementation plan from **spec + test code** and write it to
+   `.sdd/PLAN-code<branch>.md`. The prompt must include the approved spec, the approved
+   test code, your research notes, implementation targets, local patterns, and the
+   verification loop. Require file-change sequence, per-file intent at the function level,
+   risks, and commands proving readiness. Read the plan from disk, invoke `plan-critic` in
+   code-plan mode, then have GPT fix blocking findings once if needed. Carry non-blocking
+   findings to the gate. Check `Plan`.
+3. **GATE 4.** Present the plan + `plan-critic` non-blocking findings; approve or feedback.
 4. **Build logic** (GPT → you ≤3 rounds). GPT authors the implementation via `build`. Then
    loop: run the full verification (test → lint → typecheck → build) — **the test-phase
    tests must pass**; any failing command is a blocking finding GPT must fix before review.
@@ -224,14 +211,14 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 
 ## 2. Tests Phase
 - [ ] Research (Claude only, from spec)
-- [ ] Plan test code (Claude draft -> GPT review 1x -> edit)
+- [ ] Plan test code (GPT author -> Claude plan-critic 1x -> GPT fix)
 - [ ] GATE 2: human approves test plan
 - [ ] Build test code (GPT author -> Claude review <=3x -> GPT fix; new tests fail for the right reason)
 - [ ] GATE 3: human approves test code
 
 ## 3. Code Phase
 - [ ] Research (Claude only, from spec + test code)
-- [ ] Plan logic (Claude draft -> GPT review 1x -> edit)
+- [ ] Plan logic (GPT author -> Claude plan-critic 1x -> GPT fix)
 - [ ] GATE 4: human approves code plan
 - [ ] Build logic (GPT author -> Claude review <=3x -> GPT fix; full verification, tests must pass)
 - [ ] GATE 5: human approves logic code

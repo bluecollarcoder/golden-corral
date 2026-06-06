@@ -57,9 +57,10 @@ for lib_file in "$SCRIPT_DIR/config/lib/"*; do
 done
 chmod +x "$CLAUDE_SDD_LIB_DIR/sdd-codex.sh"
 
-# Critic agents — Claude subagents the orchestrator uses to review GPT's code.
+# Critic agents — Claude subagents the orchestrator uses to review GPT's plans and code.
 agent_description() {
     case "$1" in
+        plan-critic)  printf '%s' "Reviews GPT-authored test and implementation plans for scope, coverage, economy, and decision-completeness." ;;
         test-critic)  printf '%s' "Reviews tests for coverage, failure quality, mock fidelity, and missing assertions." ;;
         code-critic)  printf '%s' "Reviews implementation for correctness, security, performance, maintainability, and verification gaps." ;;
         *)            printf '%s' "Evidence-based SDD critic agent." ;;
