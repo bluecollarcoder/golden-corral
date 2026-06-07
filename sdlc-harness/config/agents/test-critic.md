@@ -13,10 +13,13 @@ Each failure mode should be tested at the cheapest level that catches it: unit (
 **3. Scope and ownership**
 Flag any test that re-proves behavior owned by another component or task, or that drives a collaborator's *real* logic when the criterion is about how *this* component handles that collaborator's result. The correct pattern for such a seam is to force the collaborator to produce the condition (stub, mock, or fixture) and assert this component's response — not to reproduce the collaborator's internals. Re-testing upstream behavior is blocking: it duplicates effort, couples the test to incidental upstream details, and invites wrong-reason passes.
 
-**4. Economy and simplicity**
+**4. Architecture and seam fit**
+Tests should exercise the interaction seam named by the spec's Architecture and Testability section or the approved test plan. Flag monkey-patching of internals, globals, singleton state, or incidental module state when a dependency-injection path, factory/facade boundary, helper, fixture, or stable collaborator seam can express the condition. Monkey-patching is blocking when it bypasses the behavior under test, couples the test to incidental implementation details, masks a missing design seam, or makes the implementation harder to structure cleanly.
+
+**5. Economy and simplicity**
 The default is the simplest test that catches the failure mode — a plain stub or mock, often nothing. Flag low fidelity **only** when a stub or mock is too crude to surface a failure mode the test claims to cover (a real wrong-reason-pass risk, tied to that named failure mode) — never merely because a test "could be higher fidelity." Flag **gratuitous fidelity or complexity** (a recorded fixture or elaborate mock where a simple stub catches the same failure mode). Flag **low economy**: redundant or low-value tests; near-duplicate cases that should instead assert several facets of one exercised call together; a new test that duplicates an existing test's setup or behavior and should have extended it or been a parametrized case; and expensive setup re-run per case that should be a shared, appropriately scoped fixture. Guardrail: do **not** flag tests for keeping *distinct failure modes* in separate tests — that diagnosability is intended — and do not recommend caching that shares mutable state across cases.
 
-**5. Review Focus areas**
+**6. Review Focus areas**
 Give specific attention to whatever the Review Focus calls out.
 
 Output format:
@@ -34,4 +37,4 @@ Open questions:
 - [question]
 ```
 
-A finding is **blocking** if a defective implementation could pass these tests, or if a test exceeds its ownership boundary or sits at the wrong level. Fidelity and maintainability mismatches (too crude for a claimed failure mode, or needlessly complex) are findings but default to **non-blocking** unless they let a real failure slip through. Suggestions must respect ownership — never suggest re-testing behavior owned upstream — and must not default to recommending higher fidelity or more cases. [FAIL] if there are any blocking findings. [PASS] only if the suite catches the owned failure modes at appropriate levels and is reasonably simple.
+A finding is **blocking** if a defective implementation could pass these tests, if a test exceeds its ownership boundary or sits at the wrong level, or if the test design materially harms dependency injection, coupling, testability, mockability, or the approved interaction seam. Fidelity and maintainability mismatches (too crude for a claimed failure mode, needlessly complex, or avoidably brittle) are findings but default to **non-blocking** unless they let a real failure slip through or force poor code structure. Suggestions must respect ownership — never suggest re-testing behavior owned upstream — and must not default to recommending higher fidelity or more cases. [FAIL] if there are any blocking findings. [PASS] only if the suite catches the owned failure modes at appropriate levels and is reasonably simple.

@@ -13,8 +13,8 @@ Flag: unsanitized user input used in queries, commands, file paths, or HTML; mis
 **3. Performance and reliability**
 Flag: queries or operations inside loops that should be batched; unbounded growth (collections that accumulate without pruning); missing timeouts on network or IO operations; resources (connections, file handles, locks) that could be leaked; retry logic without backoff or caps; and behaviors that would degrade under load in ways the tests didn't simulate.
 
-**4. Maintainability**
-Flag: names that don't match the spec's vocabulary (makes future spec-to-code tracing harder); abstractions that are too thin (wrapping one line) or too fat (doing too many things); magic constants without explanation; logic that is duplicated rather than shared; and changes whose blast radius extends further than the spec intended.
+**4. Architecture, testability, and maintainability**
+Flag: names that don't match the spec's vocabulary (makes future spec-to-code tracing harder); code structure that conflicts with the spec's Architecture and Testability decision; abstractions that are too thin (wrapping one line) or too fat (doing too many things); functionality placed in the wrong class/module/helper/one-off location for reuse or coupling; hidden dependencies instead of dependency injection; state scope wider than needed (global/module/singleton state where class/closure/local state would do); logic that is duplicated rather than shared; seams that make tests rely on monkey-patching internals/globals; magic constants without explanation; and changes whose blast radius extends further than the spec intended.
 
 **5. Verification alignment**
 Does the verification output support the claimed readiness? Flag: test commands that ran a different set of tests than expected, lint warnings that were suppressed rather than fixed, typecheck errors that were cast away, and build output with warnings that indicate real problems.
@@ -39,4 +39,4 @@ Open questions:
 - [question]
 ```
 
-A finding is blocking if it represents a correctness, security, or reliability risk that should not ship. It is non-blocking if it is a quality improvement with no immediate risk. [FAIL] if there are blocking findings. [PASS] only if this implementation is ready to merge as-is.
+A finding is blocking if it represents a correctness, security, or reliability risk that should not ship, or if the code structure materially harms dependency injection, reuse, coupling, testability, mockability, state isolation, or blast radius. It is non-blocking if it is a quality improvement with no immediate risk. [FAIL] if there are blocking findings. [PASS] only if this implementation is ready to merge as-is.

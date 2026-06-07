@@ -53,25 +53,42 @@ once the step's output exists.
 ## Spec phase
 
 1. **Research** (you + human). Read the linked request in full. Find affected files, APIs,
-   schemas, configs, and downstream dependencies. Note prior decisions, risks, and open
-   questions. Collaborate with the human to resolve intent. Output: Detected state | Key
-   findings | Constraints | Open questions. Check `Research`.
+   schemas, configs, downstream dependencies, existing design patterns, and test seams. Note
+   prior decisions, risks, and open questions. Collaborate with the human to resolve intent.
+   Output: Detected state | Key findings | Architecture/testability constraints | Open
+   questions. Check `Research`.
 2. **Build spec** (you). Choose the `specs/<module>/` folder from the affected area and
    derive the slug from the task title. Create `<root>/specs/<module>/` if needed and
    write `<root>/specs/<module>/<slug>.md` using the Spec structure at the end of this
    skill, with every section filled and
-   acceptance criteria numbered and individually testable. The `Test Strategy` section is a
-   real rubric, not a sentence: name failure modes, ownership here vs upstream, test level
-   for each (unit / integration / acceptance), rough sizing per level, and any specific
-   failure mode that justifies a high-fidelity fixture or mock. Default otherwise to the
-   simplest good-enough stub. While writing, keep the acceptance criteria and test strategy
-   essential and economical: every criterion maps to user-visible or contract-level behavior
-   from the spec; no criterion tests implementation details, incidental sequencing, or
-   upstream-owned behavior; criteria are individually testable and non-overlapping; the test
-   strategy covers the implied failure modes without duplicate cases; coverage is pushed to
-   the cheapest level that catches each failure; high-fidelity fixtures are used only when a
-   named failure mode requires them; and nice-to-have, exploratory, or defensive breadth is
-   moved to risks/notes or dropped. Read it back for coherence. Check `Build`.
+   acceptance criteria numbered, individually testable, and limited to behavior that must
+   change or remain guaranteed for the user goal to be satisfied. Use `Architecture and
+   Testability` to choose the smallest code structure that preserves dependency injection,
+   reuse, loose coupling, testability, and mockability. Address where functionality belongs
+   (class/module/helper/one-off), interaction seams, stateful vs stateless behavior, and
+   state scope (global/module/class/closure) when those choices affect tests or blast
+   radius. Prefer existing interfaces, design patterns, helpers, fixtures, and test
+   conventions.
+
+   The `Test Strategy` section is a real rubric, not a sentence. It names only the new or
+   changed behavior that needs additional coverage, notes existing tests that already cover
+   unchanged behavior when relevant, and uses the cheapest effective test level. For each
+   failure mode, name ownership here vs upstream, test level (unit / integration /
+   acceptance), rough sizing per level, and any specific failure mode that justifies a
+   high-fidelity fixture or mock. Default otherwise to the simplest good-enough stub.
+
+   Before Gate 1, run a scope-control pass. The pass is allowed to delete or narrow spec
+   content, acceptance criteria, architecture notes, and test strategy. It should not add new
+   scope unless required to resolve a contradiction or make the change testable. Check for
+   duplicated coverage of existing tests; acceptance criteria that do not map to the user
+   goal or an external contract; contradictory requirements; architectural choices that
+   increase coupling, global state, or blast radius without need; missed reuse of existing
+   patterns, helpers, fixtures, or seams; and test strategies that rely on monkey-patching
+   where ordinary dependency structure would make the code easy to test.
+
+   Revise the spec before presenting Gate 1. Mention only remaining material risks or
+   tradeoffs in the Gate 1 presentation; do not include a QA report when the pass only
+   removed or narrowed content. Check `Build`.
 3. **GATE 1.** Present the spec and ask the human to approve or give feedback. On approval,
    check the gate, then stop and tell the human to resume Tests and Code in Claude Code
    with `/sdd`. On feedback, revise the spec and re-present. There is no AI critic in this
@@ -153,6 +170,11 @@ readiness assessment. Ask the human to approve or give feedback, and stop.
 
 ## Interfaces and Data
 [Signatures, endpoints, schemas, columns, config keys, message formats - with types.]
+
+## Architecture and Testability
+[Chosen code structure and why: where functionality belongs, dependency injection path,
+reuse points, coupling boundaries, interaction seams, stateful vs stateless behavior, state
+scope, and how tests should exercise the seam without patching internals.]
 
 ## Edge Cases and Failure Modes
 - When [condition]: [expected behavior]

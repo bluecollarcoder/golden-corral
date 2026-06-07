@@ -90,56 +90,78 @@ to see what GPT actually did.
 
 ### Spec phase
 1. **Research** (you + human). Read the linked request in full. Find affected files, APIs,
-   schemas, configs, and downstream dependencies. Note prior decisions, risks, and open
-   questions. Collaborate with the human to resolve intent. Output: Detected state | Key
-   findings | Constraints | Open questions. Check `Research`.
+   schemas, configs, downstream dependencies, existing design patterns, and test seams. Note
+   prior decisions, risks, and open questions. Collaborate with the human to resolve intent.
+   Output: Detected state | Key findings | Architecture/testability constraints | Open
+   questions. Check `Research`.
 2. **Build spec** (you). Choose the `specs/<module>/` folder from the affected area and
    derive the slug from the task title. Create `<root>/specs/<module>/` if needed and
    write `<root>/specs/<module>/<slug>.md` using the Spec structure at the end of this
-   skill — every section filled, acceptance
-   criteria numbered and individually testable. The `Test Strategy` section is a real
-   rubric, not a sentence: name the **failure modes** to catch and which are owned here vs.
-   upstream (covered by their tests); the **level** for each (unit / integration /
-   acceptance); rough **sizing** per level; and any **specific failure mode that justifies a
-   high-fidelity fixture or mock** — defaulting otherwise to the simplest good-enough stub.
-   While writing, keep the acceptance criteria and test strategy essential and economical:
-   every criterion maps to user-visible or contract-level behavior from the spec; no
-   criterion tests implementation details, incidental sequencing, or upstream-owned
-   behavior; criteria are individually testable and non-overlapping; the test strategy
-   covers the implied failure modes without duplicate cases; coverage is pushed to the
-   cheapest level that catches each failure; high-fidelity fixtures are used only when a
-   named failure mode requires them; and nice-to-have, exploratory, or defensive breadth is
-   moved to risks/notes or dropped. Read it back for coherence. Check `Build`.
+   skill — every section filled, acceptance criteria numbered, individually testable, and
+   limited to behavior that must change or remain guaranteed for the user goal to be
+   satisfied. Use `Architecture and Testability` to choose the smallest code structure that
+   preserves dependency injection, reuse, loose coupling, testability, and mockability.
+   Address where functionality belongs (class/module/helper/one-off), interaction seams,
+   stateful vs stateless behavior, and state scope (global/module/class/closure) when those
+   choices affect tests or blast radius. Prefer existing interfaces, design patterns,
+   helpers, fixtures, and test conventions.
+
+   The `Test Strategy` section is a real rubric, not a sentence. It names only the new or
+   changed behavior that needs additional coverage, notes existing tests that already cover
+   unchanged behavior when relevant, and uses the cheapest effective test level. For each
+   failure mode, name ownership here vs upstream, test level (unit / integration /
+   acceptance), rough sizing per level, and any specific failure mode that justifies a
+   high-fidelity fixture or mock. Default otherwise to the simplest good-enough stub.
+
+   Before Gate 1, run a scope-control pass. The pass is allowed to delete or narrow spec
+   content, acceptance criteria, architecture notes, and test strategy. It should not add new
+   scope unless required to resolve a contradiction or make the change testable. Check for
+   duplicated coverage of existing tests; acceptance criteria that do not map to the user
+   goal or an external contract; contradictory requirements; architectural choices that
+   increase coupling, global state, or blast radius without need; missed reuse of existing
+   patterns, helpers, fixtures, or seams; and test strategies that rely on monkey-patching
+   where ordinary dependency structure would make the code easy to test.
+
+   Revise the spec before presenting Gate 1. Mention only remaining material risks or
+   tradeoffs in the Gate 1 presentation; do not include a QA report when the pass only
+   removed or narrowed content. Check `Build`.
 3. **GATE 1.** Present the spec and ask the human to approve or give feedback. On approval,
    check the gate. On feedback, revise the spec and re-present (no AI critic in this phase).
 
 ### Tests phase
-1. **Research** (you). Read the approved spec and its Test Strategy. For each acceptance
-   criterion, identify its **failure modes**, the **unit under test** and its collaborators,
-   whether the behavior is **owned here or upstream**, and the intended **level** (unit /
-   integration / acceptance). Upstream-owned behavior is covered by its own tests — here you
-   cover only this component's interaction with it. Classify each criterion: covered /
-   needs-new-test / untestable (say why). Search for **existing tests covering the same
-   unit/area** and note which could be extended (an added assertion or a parametrized case)
-   versus where a new test is warranted; also find reusable fixtures, factories, mocks.
-   Confirm the test command and what a meaningful failure looks like. Check `Research`.
+1. **Research** (you). Read the approved spec, its Architecture and Testability section, and
+   its Test Strategy. For each acceptance criterion, identify its **failure modes**, the
+   **unit under test**, collaborators, intended interaction seam, whether behavior is **owned
+   here or upstream**, and the intended **level** (unit / integration / acceptance).
+   Upstream-owned behavior is covered by its own tests — here you cover only this component's
+   interaction with it. Classify each criterion: covered / needs-new-test / untestable (say
+   why). Search for **existing tests covering the same unit/area** and note which could be
+   extended (an added assertion or a parametrized case) versus where a new test is warranted;
+   also find reusable fixtures, factories, mocks, dependency-injection points, and local
+   mocking conventions. Confirm the test command and what a meaningful failure looks like.
+   Check `Research`.
 2. **Plan test code** (GPT → you 1 round). Prompt GPT via `build` to author a
    decision-complete **test-code-only** plan and write it to `.sdd/PLAN-tests<branch>.md`.
    The prompt must include the approved spec, your research notes, reusable tests/fixtures,
    the exact test command, and the expected failure shape. Require the plan to cover, for
-   each case: the failure mode it catches, its level, the simplest mechanism that catches it
-   (plain stub/mock by default; high-fidelity fixture only when justified by a named failure
-   mode), and an assertion that binds to owned behavior. Require economical case count,
-   reuse-vs-new choices, and no upstream re-testing. Read the plan from disk, invoke
+   each case: the failure mode it catches, its level, the interaction seam it uses, the
+   simplest mechanism that catches it (plain stub/mock through a stable seam by default;
+   high-fidelity fixture only when justified by a named failure mode), and an assertion that
+   binds to owned behavior. Require economical case count, reuse-vs-new choices, no upstream
+   re-testing, and explicit justification for any monkey-patching of internals, globals, or
+   incidental module state. If the spec's architecture is not testable as written, the plan
+   must call that out instead of hiding it with brittle tests. Read the plan from disk, invoke
    `plan-critic` in test-plan mode, then have GPT fix blocking findings once if needed.
    Carry non-blocking findings to the gate. Check `Plan`.
 3. **GATE 2.** Present the plan + `plan-critic` non-blocking findings; approve or feedback.
 4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
    (prompt = spec + approved plan + exact files to write). Instruct GPT to follow the plan's
-   level and mechanism per case: favor simple, maintainable, economical tests; reuse existing
-   tests/fixtures/helpers as the plan specifies; stub/mock collaborators to create the
-   condition (or load a high-fidelity fixture only where the plan justified one); keep each
-   test at its chosen level and within the task's ownership boundary. Then loop:
+   level, seam, and mechanism per case: favor simple, maintainable, economical tests; reuse
+   existing tests/fixtures/helpers as the plan specifies; stub/mock collaborators through
+   stable dependency seams to create the condition (or load a high-fidelity fixture only
+   where the plan justified one); do not patch internals/globals/incidental module state when
+   the approved architecture provides a normal seam; keep each test at its chosen level and
+   within the task's ownership boundary. Then loop:
    run the test command
    (deterministic check — the important new tests must **fail for the behavioral reason**,
    not infra; a premature pass is itself a blocking finding); invoke `test-critic` with the
@@ -151,21 +173,27 @@ to see what GPT actually did.
    review once (`test-critic`) → re-present to the human; repeat until approved.
 
 ### Code phase
-1. **Research** (you). From the spec + the test code: identify implementation targets,
-   local patterns, import styles, reusable utilities, and the verification loop order
+1. **Research** (you). From the spec + the test code: identify implementation targets, the
+   approved Architecture and Testability decisions, local patterns, import styles, reusable
+   utilities, dependency-injection points, state boundaries, and the verification loop order
    (test → lint → typecheck → build). Check `Research`.
 2. **Plan logic** (GPT → you 1 round). Prompt GPT via `build` to author a
    decision-complete implementation plan from **spec + test code** and write it to
    `.sdd/PLAN-code<branch>.md`. The prompt must include the approved spec, the approved
-   test code, your research notes, implementation targets, local patterns, and the
-   verification loop. Require file-change sequence, per-file intent at the function level,
-   risks, and commands proving readiness. Read the plan from disk, invoke `plan-critic` in
-   code-plan mode, then have GPT fix blocking findings once if needed. Carry non-blocking
-   findings to the gate. Check `Plan`.
+   test code, your research notes, implementation targets, local patterns, architecture and
+   testability decisions, and the verification loop. Require file-change sequence, per-file
+   intent at the function level, where functionality belongs (class/module/helper/one-off),
+   stateful vs stateless structure, state scope, dependency boundaries, reuse points,
+   coupling tradeoffs, risks, and commands proving readiness. Read the plan from disk, invoke
+   `plan-critic` in code-plan mode, then have GPT fix blocking findings once if needed.
+   Carry non-blocking findings to the gate. Check `Plan`.
 3. **GATE 4.** Present the plan + `plan-critic` non-blocking findings; approve or feedback.
-4. **Build logic** (GPT → you ≤3 rounds). GPT authors the implementation via `build`. Then
-   loop: run the full verification (test → lint → typecheck → build) — **the test-phase
-   tests must pass**; any failing command is a blocking finding GPT must fix before review.
+4. **Build logic** (GPT → you ≤3 rounds). GPT authors the implementation via `build`.
+   Instruct GPT to follow the approved architecture and code plan, preserve the smallest
+   practical blast radius, reuse existing patterns/utilities, avoid opportunistic
+   abstractions or refactors, and keep dependency injection, state scope, and interaction
+   seams testable. Then loop: run the full verification (test → lint → typecheck → build) —
+   **the test-phase tests must pass**; any failing command is a blocking finding GPT must fix before review.
    Once green, invoke `code-critic` with spec + tests + impl + verification output as a
    review round; have GPT `fix` blocking findings (diff-scoped after round 1), up to 3
    rounds. Stop early on zero blockers; at the cap, escalate. Check `Build`.
@@ -250,6 +278,11 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 
 ## Interfaces and Data
 [Signatures, endpoints, schemas, columns, config keys, message formats — with types.]
+
+## Architecture and Testability
+[Chosen code structure and why: where functionality belongs, dependency injection path,
+reuse points, coupling boundaries, interaction seams, stateful vs stateless behavior, state
+scope, and how tests should exercise the seam without patching internals.]
 
 ## Edge Cases and Failure Modes
 - When [condition]: [expected behavior]
