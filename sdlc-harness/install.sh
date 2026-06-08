@@ -82,7 +82,6 @@ for agent_file in "$SCRIPT_DIR/config/agents/"*.md; do
     {
         printf 'name = "%s"\n' "$agent_name"
         printf 'description = "%s"\n' "$description"
-        printf 'model_reasoning_effort = "high"\n'
         printf 'sandbox_mode = "read-only"\n'
         printf "%s\n" "developer_instructions = '''"
         cat "$agent_file"
