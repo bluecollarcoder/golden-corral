@@ -1,12 +1,12 @@
 ---
 name: sdd
-description: Run the full Spec-Driven Development workflow for high-risk work end to end in Claude, Codex, or Cursor after or including the Spec phase. It drives Spec -> Tests -> Code, pausing only at the 5 human approval gates, and resumes from .sdd/TASK state on re-invocation. GPT is reached through the codex CLI, and each host bootstraps its own critic agents.
+description: Run the full Spec-Driven Development workflow for high-risk work end to end in Claude, Codex, or Cursor after or including the Spec phase. It drives Spec -> Build, pausing only at the 3 human approval gates, and resumes from .sdd/TASK state on re-invocation. GPT is reached through the codex CLI, and each host bootstraps its own critic agents.
 disable-model-invocation: true
 ---
 
 You are the host orchestrator for a high-risk Spec-Driven Development task in Claude,
 Codex, or Cursor. The human starts this skill once and may resume it in any supported host.
-You drive the workflow through Tests and Code and **stop only at the 5 human gates**. You
+You drive the workflow through Build and **stop only at the 3 human gates**. You
 are resumable: all progress lives in the TASK file, so a fresh session re-reads it and
 continues from the first incomplete item.
 
@@ -15,17 +15,18 @@ continues from the first incomplete item.
 | Artifact | Author | AI critic |
 |----------|--------|-----------|
 | Spec | Host orchestrator | — (human only) |
-| Test plan | GPT | host `plan-critic`, 1 round |
+| Test plan | GPT | host `test-plan-critic`, 1 round |
+| Code plan | GPT | host `code-plan-critic`, 1 round |
 | Test code | GPT | host `test-critic`, ≤3 rounds |
-| Code plan | GPT | host `plan-critic`, 1 round |
 | Logic code | GPT | host `code-critic`, ≤3 rounds |
 
 - You reach **GPT** through the host-local installed `sdd-codex.sh` wrapper (it calls
   `codex exec`): `~/.claude/sdd/sdd-codex.sh` in Claude, `~/.codex/sdd/sdd-codex.sh` in
   Codex, or the active underlying host path in Cursor. If no wrapper is available, stop
   before calling GPT and tell the human which wrapper path is missing.
-- You review **GPT's plans** with the host-local `plan-critic` agent, **GPT's tests** with
-  the host-local `test-critic` agent, and **GPT's implementation** with the host-local
+- You review **GPT's test plan** with the host-local `test-plan-critic` agent, **GPT's
+  code plan** with the host-local `code-plan-critic` agent, **GPT's tests** with the
+  host-local `test-critic` agent, and **GPT's implementation** with the host-local
   `code-critic` agent.
 - When a phase says to invoke a critic, dispatch or spawn that named host-local critic
   agent, provide the artifact plus required context, wait for its result, and use that
@@ -36,12 +37,14 @@ continues from the first incomplete item.
 
 ## Critic bootstrap
 
-Before any Tests Phase or Code Phase step that invokes `plan-critic`, `test-critic`, or
-`code-critic`, ensure the current host has those three critic agents available:
+Before any Build Phase step that invokes `test-plan-critic`, `code-plan-critic`,
+`test-critic`, or `code-critic`, ensure the current host has those four critic agents
+available:
 
-- Claude: `~/.claude/agents/plan-critic.md`, `~/.claude/agents/test-critic.md`, and
-  `~/.claude/agents/code-critic.md`.
-- Codex: `~/.codex/agents/plan-critic.toml`, `~/.codex/agents/test-critic.toml`, and
+- Claude: `~/.claude/agents/test-plan-critic.md`, `~/.claude/agents/code-plan-critic.md`,
+  `~/.claude/agents/test-critic.md`, and `~/.claude/agents/code-critic.md`.
+- Codex: `~/.codex/agents/test-plan-critic.toml`,
+  `~/.codex/agents/code-plan-critic.toml`, `~/.codex/agents/test-critic.toml`, and
   `~/.codex/agents/code-critic.toml`.
 - Cursor: use the active underlying Claude or Codex host path available in the current
   environment; do not require a separate Cursor-specific command or rules install.
@@ -49,8 +52,8 @@ Before any Tests Phase or Code Phase step that invokes `plan-critic`, `test-crit
 The installed critic agents are generated from the shared prompt bodies in
 `config/agents/*.md`. If the required critic agents are missing and the source prompt bodies
 are available, create the missing host-local agent files before continuing. If the source
-prompt bodies are not available or the host cannot create agent files, stop before Tests or
-Code work and tell the human exactly which critic setup is missing.
+prompt bodies are not available or the host cannot create agent files, stop before Build
+work and tell the human exactly which critic setup is missing.
 
 ## Resolve the TASK file
 
@@ -156,80 +159,79 @@ to see what GPT actually did.
 3. **GATE 1.** Present the spec and ask the human to approve or give feedback. On approval,
    check the gate. On feedback, revise the spec and re-present (no AI critic in this phase).
 
-### Tests phase
+### Build phase
 1. **Research** (you). Read the approved spec, its Architecture and Testability section, and
    its Test Strategy. For each acceptance criterion, identify its **failure modes**, the
    **unit under test**, collaborators, intended interaction seam, whether behavior is **owned
    here or upstream**, and the intended **level** (unit / integration / acceptance).
    Upstream-owned behavior is covered by its own tests — here you cover only this component's
-   interaction with it. Classify each criterion: covered / needs-new-test / untestable (say
-   why). Search for **existing tests covering the same unit/area** and note which could be
-   extended (an added assertion or a parametrized case) versus where a new test is warranted;
-   also find reusable fixtures, factories, mocks, dependency-injection points, and local
-   mocking conventions. Confirm the test command and what a meaningful failure looks like.
-   Check `Research`.
-2. **Plan test code** (GPT → you 1 round). Prompt GPT via `build` to author a
-   decision-complete **test-code-only** plan and write it to `.sdd/PLAN-tests<branch>.md`.
-   The prompt must include the approved spec, your research notes, reusable tests/fixtures,
-   the exact test command, and the expected failure shape. Require the plan to cover, for
-   each case: the failure mode it catches, its level, the interaction seam it uses, the
-   simplest mechanism that catches it (plain stub/mock through a stable seam by default;
-   high-fidelity fixture only when justified by a named failure mode), and an assertion that
-   binds to owned behavior and remains valuable after any migration or refactor is complete.
-   Require economical case count, reuse-vs-new choices, no upstream re-testing, no
-   migration-only assertions unless they protect an ongoing compatibility or user-visible
-   contract, and explicit justification for any monkey-patching of internals, globals, or
-   incidental module state. If the spec's architecture is not testable as written, the plan
-   must call that out instead of hiding it with brittle tests. Read the plan from disk, invoke
-   `plan-critic` in test-plan mode, then have GPT fix blocking findings once if needed.
-   Carry non-blocking findings to the gate. Check `Plan`.
-3. **GATE 2.** Present the plan + `plan-critic` non-blocking findings; approve or feedback.
+   interaction with it. Search for existing tests covering the same unit/area and note which
+   could be extended versus where a new test is warranted; also find reusable fixtures,
+   factories, mocks, dependency-injection points, local mocking conventions, implementation
+   targets, import styles, reusable utilities, state boundaries, and the verification loop
+   order (test → lint → typecheck → build). Confirm the test command and what a meaningful
+   failure looks like. Check `Research`.
+2. **Plan build** (GPT → you 1 round per critic). Prompt GPT via `build` to author a paired,
+   decision-complete build plan and write two separate files:
+   `.sdd/PLAN-tests<branch>.md` and `.sdd/PLAN-code<branch>.md`. The prompt must include the
+   approved spec, your research notes, reusable tests/fixtures, implementation targets, local
+   patterns, Architecture and Testability decisions, the exact test command, the expected
+   failure shape, and the verification loop.
+
+   Require the test plan to cover, for each case: the failure mode it catches, its level, the
+   interaction seam it uses, the simplest mechanism that catches it (plain stub/mock through a
+   stable seam by default; high-fidelity fixture only when justified by a named failure mode),
+   and an assertion that binds to owned behavior and remains valuable after any migration or
+   refactor is complete. Require economical case count, reuse-vs-new choices, no upstream
+   re-testing, no migration-only assertions unless they protect an ongoing compatibility or
+   user-visible contract, and explicit justification for any monkey-patching of internals,
+   globals, or incidental module state.
+
+   Require the code plan to cover: file-change sequence, per-file intent at the function
+   level, where functionality belongs (class/module/helper/one-off), stateful vs stateless
+   structure, state scope, dependency boundaries, reuse points, coupling tradeoffs, risks, and
+   commands proving readiness. The code plan must respect the test plan's intended seams and
+   must not require rewriting approved tests around the implementation. If the spec's
+   architecture is not testable as written, either plan must call that out instead of hiding
+   it with brittle tests or implementation structure.
+
+   Read both plans from disk. Invoke `test-plan-critic` on the test plan with the code plan as
+   context, then invoke `code-plan-critic` on the code plan with the test plan as context.
+   Have GPT fix blocking findings once if needed, scoped to the affected plan file(s). Carry
+   non-blocking findings to the gate. Check `Plan`.
+3. **GATE 2.** Present both plans plus `test-plan-critic` and `code-plan-critic`
+   non-blocking findings; approve or feedback.
 4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
-   (prompt = spec + approved plan + exact files to write). Instruct GPT to follow the plan's
-   level, seam, and mechanism per case: favor simple, maintainable, economical tests; reuse
-   existing tests/fixtures/helpers as the plan specifies; stub/mock collaborators through
-   stable dependency seams to create the condition (or load a high-fidelity fixture only
-   where the plan justified one); do not patch internals/globals/incidental module state when
-   the approved architecture provides a normal seam; keep each test at its chosen level and
-   within the task's ownership boundary. Then loop:
+   (prompt = spec + approved test plan + approved code plan + exact files to write).
+   Instruct GPT to follow the plan's level, seam, and mechanism per case: favor simple,
+   maintainable, economical tests; reuse existing tests/fixtures/helpers as the plan
+   specifies; stub/mock collaborators through stable dependency seams to create the condition
+   (or load a high-fidelity fixture only where the plan justified one); do not patch
+   internals/globals/incidental module state when the approved architecture provides a normal
+   seam; keep each test at its chosen level and within the task's ownership boundary. Then
+   loop:
    run the test command
    (deterministic check — the important new tests must **fail for the behavioral reason**,
    not infra; a premature pass is itself a blocking finding); invoke `test-critic` with the
    spec + test files as a review round; if blocking findings remain, have GPT `fix` them
    (diff-scoped after round 1) and repeat, up to 3 rounds. Stop early on zero blockers; at
-   the cap, escalate. Record the test command output as evidence. Check `Build`.
-5. **GATE 3.** Present the tests, the failing-for-the-right-reason evidence, and findings;
-   approve or feedback. **Feedback loop:** GPT applies the human's fixes (`fix`) → you
-   review once (`test-critic`) → re-present to the human; repeat until approved.
-
-### Code phase
-1. **Research** (you). From the spec + the test code: identify implementation targets, the
-   approved Architecture and Testability decisions, local patterns, import styles, reusable
-   utilities, dependency-injection points, state boundaries, and the verification loop order
-   (test → lint → typecheck → build). Check `Research`.
-2. **Plan logic** (GPT → you 1 round). Prompt GPT via `build` to author a
-   decision-complete implementation plan from **spec + test code** and write it to
-   `.sdd/PLAN-code<branch>.md`. The prompt must include the approved spec, the approved
-   test code, your research notes, implementation targets, local patterns, architecture and
-   testability decisions, and the verification loop. Require file-change sequence, per-file
-   intent at the function level, where functionality belongs (class/module/helper/one-off),
-   stateful vs stateless structure, state scope, dependency boundaries, reuse points,
-   coupling tradeoffs, risks, and commands proving readiness. Read the plan from disk, invoke
-   `plan-critic` in code-plan mode, then have GPT fix blocking findings once if needed.
-   Carry non-blocking findings to the gate. Check `Plan`.
-3. **GATE 4.** Present the plan + `plan-critic` non-blocking findings; approve or feedback.
-4. **Build logic** (GPT → you ≤3 rounds). GPT authors the implementation via `build`.
-   Instruct GPT to follow the approved architecture and code plan, preserve the smallest
-   practical blast radius, reuse existing patterns/utilities, avoid opportunistic
+   the cap, escalate. Record the test command output as evidence. Check `Build test code`.
+5. **Build logic** (GPT → you ≤3 rounds). Start only after test code has zero blocking
+   `test-critic` findings and the important new tests fail for the right reason. GPT authors
+   the implementation via `build` (prompt = spec + approved plans + approved tests + exact
+   files to write). Instruct GPT to follow the approved architecture and code plan, preserve
+   the smallest practical blast radius, reuse existing patterns/utilities, avoid opportunistic
    abstractions or refactors, and keep dependency injection, state scope, and interaction
    seams testable. Then loop: run the full verification (test → lint → typecheck → build) —
-   **the test-phase tests must pass**; any failing command is a blocking finding GPT must fix before review.
-   Once green, invoke `code-critic` with spec + tests + impl + verification output as a
-   review round; have GPT `fix` blocking findings (diff-scoped after round 1), up to 3
-   rounds. Stop early on zero blockers; at the cap, escalate. Check `Build`.
-5. **GATE 5.** Present the implementation, the green verification output, and findings;
-   approve or feedback. **Feedback loop:** GPT fixes → you review once (`code-critic`) →
-   re-present; repeat until approved. On approval, the task is complete.
+   the Build-phase tests must pass; any failing command is a blocking finding GPT must fix
+   before review. Once green, invoke `code-critic` with spec + plans + tests + impl +
+   verification output as a review round; have GPT `fix` blocking findings (diff-scoped after
+   round 1), up to 3 rounds. Stop early on zero blockers; at the cap, escalate. Check `Build
+   logic`.
+6. **GATE 3.** Present the test code, logic code, failing-test evidence, green verification
+   output, and findings; approve or feedback. **Feedback loop:** GPT fixes → relevant host
+   critic reviews once (`test-critic` for test changes, `code-critic` for logic changes, both
+   if needed) → re-present; repeat until approved. On approval, the task is complete.
 
 ## Gate presentation (every gate)
 
@@ -267,26 +269,18 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 - [ ] Build spec (host orchestrator -> specs/<module>/<slug>.md at repo root)
 - [ ] GATE 1: human approves spec
 
-## 2. Tests Phase
+## 2. Build Phase
 - [ ] Research (host orchestrator, from spec)
-- [ ] Plan test code (GPT author -> host plan-critic 1x -> GPT fix)
-- [ ] GATE 2: human approves test plan
+- [ ] Plan build (GPT author writes test + code plans -> host test-plan-critic 1x + code-plan-critic 1x -> GPT fix)
+- [ ] GATE 2: human approves build plans
 - [ ] Build test code (GPT author -> host test-critic <=3x -> GPT fix; new tests fail for the right reason)
-- [ ] GATE 3: human approves test code
-
-## 3. Code Phase
-- [ ] Research (host orchestrator, from spec + test code)
-- [ ] Plan logic (GPT author -> host plan-critic 1x -> GPT fix)
-- [ ] GATE 4: human approves code plan
 - [ ] Build logic (GPT author -> host code-critic <=3x -> GPT fix; full verification, tests must pass)
-- [ ] GATE 5: human approves logic code
+- [ ] GATE 3: human approves test + logic code
 
 ## Approval Notes
 - Spec approved by:
-- Test plan approved by:
-- Test code approved by:
-- Code plan approved by:
-- Logic code approved by:
+- Build plans approved by:
+- Build approved by:
 ```
 
 ## Spec structure (write this to `<root>/specs/<module>/<slug>.md`)

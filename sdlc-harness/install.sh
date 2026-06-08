@@ -58,10 +58,11 @@ chmod +x "$CODEX_SDD_LIB_DIR/sdd-codex.sh"
 # Critic agents — host-local subagents the orchestrator uses to review GPT's plans and code.
 agent_description() {
     case "$1" in
-        plan-critic)  printf '%s' "Reviews GPT-authored test and implementation plans for scope, coverage, economy, and decision-completeness." ;;
-        test-critic)  printf '%s' "Reviews tests for coverage, failure quality, mock fidelity, and missing assertions." ;;
-        code-critic)  printf '%s' "Reviews implementation for correctness, security, performance, maintainability, and verification gaps." ;;
-        *)            printf '%s' "Evidence-based SDD critic agent." ;;
+        test-plan-critic) printf '%s' "Reviews GPT-authored test plans for coverage, failure quality, economy, and alignment with the paired code plan." ;;
+        code-plan-critic) printf '%s' "Reviews GPT-authored implementation plans for architecture, blast radius, verification, and alignment with the paired test plan." ;;
+        test-critic)      printf '%s' "Reviews tests for coverage, failure quality, mock fidelity, and missing assertions." ;;
+        code-critic)      printf '%s' "Reviews implementation for correctness, security, performance, maintainability, and verification gaps." ;;
+        *)                printf '%s' "Evidence-based SDD critic agent." ;;
     esac
 }
 

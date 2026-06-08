@@ -25,7 +25,7 @@ to work safely while keeping the human in control at a few decisive moments.
 - **Deterministic checks before critique:** run tests, linters, type checks, or builds
   before asking a model to review.
 - **Start once, stop at the gates:** the `sdd` skill drives the whole flow and pauses only
-  at the 5 human approval gates.
+  at the 3 human approval gates.
 
 A spec here is a short feature contract stored as
 `<repo-root>/specs/<module>/<task-slug>.md` — goal, non-goals, behavior, interfaces, edge
@@ -33,7 +33,7 @@ cases, acceptance criteria, test strategy.
 
 ---
 
-## One Entrypoint, Five Gates
+## One Entrypoint, Three Gates
 
 The workflow is the shared skill `sdd`, usable from Claude, Codex, or Cursor in this
 harness setup. It stores resumable state in `.sdd/TASK` and writes the approved spec to
@@ -44,15 +44,14 @@ The critic is always the non-author model:
 | Phase | Author | AI critic | Human gate |
 |-------|--------|-----------|------------|
 | Spec | host orchestrator | — | **1. Spec approved** |
-| Test plan | GPT | host `plan-critic` (1 round) | **2. Test plan approved** |
-| Test code | GPT | host `test-critic` (≤3 rounds) | **3. Test code approved** |
-| Code plan | GPT | host `plan-critic` (1 round) | **4. Code plan approved** |
-| Logic code | GPT | host `code-critic` (≤3 rounds) | **5. Logic code approved** |
+| Build plans | GPT | host `test-plan-critic` + `code-plan-critic` (1 round each) | **2. Build plans approved** |
+| Test code | GPT | host `test-critic` (≤3 rounds) | — |
+| Logic code | GPT | host `code-critic` (≤3 rounds) | **3. Build approved** |
 
 - **Host → GPT** handoffs go through `config/lib/sdd-codex.sh` (a thin `codex exec`
   wrapper), so the human no longer relays messages between models.
-- The host reviews GPT's plans and code with bootstrapped `plan-critic`, `test-critic`,
-  and `code-critic` agents.
+- The host reviews GPT's plans and code with bootstrapped `test-plan-critic`,
+  `code-plan-critic`, `test-critic`, and `code-critic` agents.
 ### Termination and cost control
 
 - Reviews return **blocking** vs **non-blocking** findings. A review loop ends the moment a
@@ -61,10 +60,13 @@ The critic is always the non-author model:
   author edit; non-blocking findings go to the human at the gate.
 - Round 1 reviews the whole artifact; **rounds 2–3 are diff-scoped** (only the changes plus
   still-open findings). This stops the "different issues every round" churn and bounds cost.
-- The Code phase will not pass its gate while the Tests-phase tests fail.
+- Logic code does not start until the test code has zero blocking `test-critic` findings
+  and the important new tests fail for the right reason.
+- The final Build gate will not pass while the Build-phase tests or verification commands
+  fail.
 
-At gates 3 and 5, human feedback runs a bounded fix loop: GPT fixes → host critic reviews once →
-back to the human, until approved.
+At the final Build gate, human feedback runs a bounded fix loop: GPT fixes → the relevant
+host critic reviews once → back to the human, until approved.
 
 ---
 
@@ -78,7 +80,8 @@ Claude Code and Codex expect.
 │   ├── skills/
 │   │   └── sdd.md                 # shared orchestrator skill
 │   ├── agents/
-│   │   ├── plan-critic.md         # plan critic prompt body
+│   │   ├── test-plan-critic.md    # test plan critic prompt body
+│   │   ├── code-plan-critic.md    # code plan critic prompt body
 │   │   ├── test-critic.md         # shared critic prompt bodies
 │   │   └── code-critic.md
 │   └── lib/
@@ -116,8 +119,10 @@ proves they are needed.
 Shared prompt bodies; `install.sh` adapts them into Claude subagent Markdown and Codex
 custom agent TOML.
 
-- **`plan-critic.md`** — decision-completeness, scope, coverage, and economy for
-  GPT-authored test/code plans.
+- **`test-plan-critic.md`** — coverage, failure quality, seams, fixture/mock economy, and
+  alignment with the paired code plan.
+- **`code-plan-critic.md`** — implementation architecture, blast radius, verification, and
+  alignment with the paired test plan.
 - **`test-critic.md`** — criterion coverage, failure quality (tests must fail for the right
   reason before code exists), boundary coverage, mock fidelity.
 - **`code-critic.md`** — correctness, security, reliability, maintainability, and whether
@@ -135,8 +140,8 @@ chmod +x install.sh && ./install.sh
 ```
 
 It is acceptable for this personal dev tool to overwrite prior harness files. The installer
-also removes the deprecated `sdd-spec` skill from prior installs. It does not manage hooks,
-MCP servers, plugins, backups, or general uninstall.
+does not manage hooks, MCP servers, plugins, backups, cleanup of deprecated files, or
+general uninstall.
 
 ---
 
@@ -151,5 +156,5 @@ Run this in the target workspace from Claude, Codex, or Cursor:
 On first run it scaffolds `.sdd/TASK-<branch>.md` and asks you to fill in Context and
 Verification Commands, then proceeds. From there it runs to the next gate and stops for
 your approval or feedback; re-running `/sdd` (even in a new session) resumes from where it
-left off. You will be asked to approve exactly five times: the spec, the test plan, the
-test code, the code plan, and the logic code.
+left off. You will be asked to approve exactly three times: the spec, the paired build
+plans, and the final test + logic code.
