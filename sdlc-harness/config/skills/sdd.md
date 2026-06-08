@@ -1,32 +1,56 @@
 ---
 name: sdd
-description: Run the full Claude-only Spec-Driven Development workflow for high-risk work end to end after or including the Spec phase. It drives Spec -> Tests -> Code, pausing only at the 5 human approval gates, and resumes from .sdd/TASK state on re-invocation. Spec may be authored by Claude or Codex via sdd-spec; Tests and Code are orchestrated only by Claude, with GPT reached through the codex CLI.
+description: Run the full Spec-Driven Development workflow for high-risk work end to end in Claude, Codex, or Cursor after or including the Spec phase. It drives Spec -> Tests -> Code, pausing only at the 5 human approval gates, and resumes from .sdd/TASK state on re-invocation. GPT is reached through the codex CLI, and each host bootstraps its own critic agents.
 disable-model-invocation: true
 ---
 
-You are the Claude-only orchestrator for a high-risk Spec-Driven Development task. The
-human starts this skill once, or resumes it after `sdd-spec` completed Gate 1 in Claude or
-Codex. You drive the workflow through Tests and Code and **stop only at the 5 human
-gates**. You are resumable: all progress lives in the TASK file, so a fresh session
-re-reads it and continues from the first incomplete item.
+You are the host orchestrator for a high-risk Spec-Driven Development task in Claude,
+Codex, or Cursor. The human starts this skill once and may resume it in any supported host.
+You drive the workflow through Tests and Code and **stop only at the 5 human gates**. You
+are resumable: all progress lives in the TASK file, so a fresh session re-reads it and
+continues from the first incomplete item.
 
 ## Roles (the critic is always the non-author model)
 
 | Artifact | Author | AI critic |
 |----------|--------|-----------|
-| Spec | Claude or Codex through `sdd-spec`; you may also author it here | — (human only) |
-| Test plan | GPT | you (Claude), 1 round via `plan-critic` |
-| Test code | GPT | you (Claude), ≤3 rounds |
-| Code plan | GPT | you (Claude), 1 round via `plan-critic` |
-| Logic code | GPT | you (Claude), ≤3 rounds |
+| Spec | Host orchestrator | — (human only) |
+| Test plan | GPT | host `plan-critic`, 1 round |
+| Test code | GPT | host `test-critic`, ≤3 rounds |
+| Code plan | GPT | host `plan-critic`, 1 round |
+| Logic code | GPT | host `code-critic`, ≤3 rounds |
 
-- You reach **GPT** through the wrapper `~/.claude/sdd/sdd-codex.sh` (it calls `codex exec`).
-- You review **GPT's plans** with the `plan-critic` subagent, **GPT's tests** with the
-  `test-critic` subagent, and **GPT's implementation** with the `code-critic` subagent.
+- You reach **GPT** through the host-local installed `sdd-codex.sh` wrapper (it calls
+  `codex exec`): `~/.claude/sdd/sdd-codex.sh` in Claude, `~/.codex/sdd/sdd-codex.sh` in
+  Codex, or the active underlying host path in Cursor. If no wrapper is available, stop
+  before calling GPT and tell the human which wrapper path is missing.
+- You review **GPT's plans** with the host-local `plan-critic` agent, **GPT's tests** with
+  the host-local `test-critic` agent, and **GPT's implementation** with the host-local
+  `code-critic` agent.
+- When a phase says to invoke a critic, dispatch or spawn that named host-local critic
+  agent, provide the artifact plus required context, wait for its result, and use that
+  result as the review output.
 - You never let an author review its own artifact — that defeats the cross-model check.
-- Tests Phase and Code Phase are Claude-only orchestration. If this prompt is somehow run
-  from Codex, stop before any Tests or Code item and tell the human to resume in Claude
-  Code with `/sdd`.
+- You must not replace these critic agents with inline review. Inline review is only an
+  explicit emergency/manual workaround if the human asks for it.
+
+## Critic bootstrap
+
+Before any Tests Phase or Code Phase step that invokes `plan-critic`, `test-critic`, or
+`code-critic`, ensure the current host has those three critic agents available:
+
+- Claude: `~/.claude/agents/plan-critic.md`, `~/.claude/agents/test-critic.md`, and
+  `~/.claude/agents/code-critic.md`.
+- Codex: `~/.codex/agents/plan-critic.toml`, `~/.codex/agents/test-critic.toml`, and
+  `~/.codex/agents/code-critic.toml`.
+- Cursor: use the active underlying Claude or Codex host path available in the current
+  environment; do not require a separate Cursor-specific command or rules install.
+
+The installed critic agents are generated from the shared prompt bodies in
+`config/agents/*.md`. If the required critic agents are missing and the source prompt bodies
+are available, create the missing host-local agent files before continuing. If the source
+prompt bodies are not available or the host cannot create agent files, stop before Tests or
+Code work and tell the human exactly which critic setup is missing.
 
 ## Resolve the TASK file
 
@@ -65,7 +89,7 @@ once the step's output exists.
 ## Shared loop mechanics
 
 **Findings format.** Every AI review produces `PASS|FAIL` and findings split into
-blocking and non-blocking. Critic subagents use their prompt-specific text format.
+blocking and non-blocking. Critic agents use their prompt-specific text format.
 
 **Blocking gate = "good enough".** A review round ends the loop early the moment it returns
 **zero blocking findings**. Otherwise the loop continues up to its cap (1 round for plans,
@@ -79,8 +103,8 @@ round — not to re-derive the whole list. Reuse finding ids across rounds for p
 
 **Calling GPT.** Write the prompt to a branch-scoped scratch file under `.sdd/` (e.g.
 `.sdd/_codex-prompt<branch>.md`), then:
-- Plan, test, or code authoring: `~/.claude/sdd/sdd-codex.sh build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
-- Applying blocking fixes: `~/.claude/sdd/sdd-codex.sh fix .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
+- Plan, test, or code authoring: `<sdd-codex-wrapper> build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
+- Applying blocking fixes: `<sdd-codex-wrapper> fix .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
 Each GPT prompt must include the relevant context inline or by file path (spec path, plan,
 the open findings, and exactly which files to write). For plans, tell GPT to write the
 exact `.sdd/PLAN-*<branch>.md` file. After a build/fix, read the changed files from disk
@@ -111,7 +135,11 @@ to see what GPT actually did.
    unchanged behavior when relevant, and uses the cheapest effective test level. For each
    failure mode, name ownership here vs upstream, test level (unit / integration /
    acceptance), rough sizing per level, and any specific failure mode that justifies a
-   high-fidelity fixture or mock. Default otherwise to the simplest good-enough stub.
+   high-fidelity fixture or mock. Default otherwise to the simplest good-enough stub. When a
+   class interface or expected output shape changes, aim tests at the new enduring contract
+   and owned failure modes. Avoid migration-only assertions that only prove the old shape,
+   adapter, class name, or transitional mapping changed, unless compatibility or
+   user-visible regression risk makes that behavior an ongoing contract.
 
    Before Gate 1, run a scope-control pass. The pass is allowed to delete or narrow spec
    content, acceptance criteria, architecture notes, and test strategy. It should not add new
@@ -147,8 +175,10 @@ to see what GPT actually did.
    each case: the failure mode it catches, its level, the interaction seam it uses, the
    simplest mechanism that catches it (plain stub/mock through a stable seam by default;
    high-fidelity fixture only when justified by a named failure mode), and an assertion that
-   binds to owned behavior. Require economical case count, reuse-vs-new choices, no upstream
-   re-testing, and explicit justification for any monkey-patching of internals, globals, or
+   binds to owned behavior and remains valuable after any migration or refactor is complete.
+   Require economical case count, reuse-vs-new choices, no upstream re-testing, no
+   migration-only assertions unless they protect an ongoing compatibility or user-visible
+   contract, and explicit justification for any monkey-patching of internals, globals, or
    incidental module state. If the spec's architecture is not testable as written, the plan
    must call that out instead of hiding it with brittle tests. Read the plan from disk, invoke
    `plan-critic` in test-plan mode, then have GPT fix blocking findings once if needed.
@@ -233,22 +263,22 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 - Code plan: `.sdd/PLAN-code<branch>.md`
 
 ## 1. Spec Phase
-- [ ] Research (Claude or Codex + human)
-- [ ] Build spec (Claude or Codex -> specs/<module>/<slug>.md at repo root)
+- [ ] Research (host orchestrator + human)
+- [ ] Build spec (host orchestrator -> specs/<module>/<slug>.md at repo root)
 - [ ] GATE 1: human approves spec
 
 ## 2. Tests Phase
-- [ ] Research (Claude only, from spec)
-- [ ] Plan test code (GPT author -> Claude plan-critic 1x -> GPT fix)
+- [ ] Research (host orchestrator, from spec)
+- [ ] Plan test code (GPT author -> host plan-critic 1x -> GPT fix)
 - [ ] GATE 2: human approves test plan
-- [ ] Build test code (GPT author -> Claude review <=3x -> GPT fix; new tests fail for the right reason)
+- [ ] Build test code (GPT author -> host test-critic <=3x -> GPT fix; new tests fail for the right reason)
 - [ ] GATE 3: human approves test code
 
 ## 3. Code Phase
-- [ ] Research (Claude only, from spec + test code)
-- [ ] Plan logic (GPT author -> Claude plan-critic 1x -> GPT fix)
+- [ ] Research (host orchestrator, from spec + test code)
+- [ ] Plan logic (GPT author -> host plan-critic 1x -> GPT fix)
 - [ ] GATE 4: human approves code plan
-- [ ] Build logic (GPT author -> Claude review <=3x -> GPT fix; full verification, tests must pass)
+- [ ] Build logic (GPT author -> host code-critic <=3x -> GPT fix; full verification, tests must pass)
 - [ ] GATE 5: human approves logic code
 
 ## Approval Notes

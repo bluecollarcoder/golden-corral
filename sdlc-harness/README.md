@@ -20,12 +20,12 @@ to work safely while keeping the human in control at a few decisive moments.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
 - **Cross-model review:** the model that authors an artifact is never the model that
-  reviews it. Claude orchestrates and reviews; GPT authors plans, tests, and code through
-  the `codex` CLI.
+  reviews it. The host orchestrator reviews through local critic agents; GPT authors
+  plans, tests, and code through the `codex` CLI.
 - **Deterministic checks before critique:** run tests, linters, type checks, or builds
   before asking a model to review.
-- **Start once, stop at the gates:** the full Claude skill drives the whole flow and pauses
-  only at the 5 human approval gates. The shared spec skill stops after Gate 1.
+- **Start once, stop at the gates:** the `sdd` skill drives the whole flow and pauses only
+  at the 5 human approval gates.
 
 A spec here is a short feature contract stored as
 `<repo-root>/specs/<module>/<task-slug>.md` — goal, non-goals, behavior, interfaces, edge
@@ -33,30 +33,26 @@ cases, acceptance criteria, test strategy.
 
 ---
 
-## Two Entrypoints, Five Gates
+## One Entrypoint, Five Gates
 
-The full workflow is the Claude-only skill `sdd`. The spec-only workflow is the shared
-skill `sdd-spec`, installed in both Claude and Codex. Both use the same `.sdd/TASK` state
-and `specs/<module>/<task-slug>.md` artifact, so a spec started in Codex can hand off
-cleanly to Claude for Tests and Code.
+The workflow is the shared skill `sdd`, usable from Claude, Codex, or Cursor in this
+harness setup. It stores resumable state in `.sdd/TASK` and writes the approved spec to
+`specs/<module>/<task-slug>.md`.
 
 The critic is always the non-author model:
 
 | Phase | Author | AI critic | Human gate |
 |-------|--------|-----------|------------|
-| Spec | Claude or Codex | — | **1. Spec approved** |
-| Test plan | GPT | Claude (1 round) | **2. Test plan approved** |
-| Test code | GPT | Claude (≤3 rounds) | **3. Test code approved** |
-| Code plan | GPT | Claude (1 round) | **4. Code plan approved** |
-| Logic code | GPT | Claude (≤3 rounds) | **5. Logic code approved** |
+| Spec | host orchestrator | — | **1. Spec approved** |
+| Test plan | GPT | host `plan-critic` (1 round) | **2. Test plan approved** |
+| Test code | GPT | host `test-critic` (≤3 rounds) | **3. Test code approved** |
+| Code plan | GPT | host `plan-critic` (1 round) | **4. Code plan approved** |
+| Logic code | GPT | host `code-critic` (≤3 rounds) | **5. Logic code approved** |
 
-- **Claude → GPT** handoffs go through `config/lib/sdd-codex.sh` (a thin `codex exec`
+- **Host → GPT** handoffs go through `config/lib/sdd-codex.sh` (a thin `codex exec`
   wrapper), so the human no longer relays messages between models.
-- **Claude reviews GPT's plans and code** with the `plan-critic`, `test-critic`, and
-  `code-critic` subagents.
-- **Codex spec mode** never plans or writes tests/code. After Gate 1 approval, resume in
-  Claude Code with `/sdd`.
-
+- The host reviews GPT's plans and code with bootstrapped `plan-critic`, `test-critic`,
+  and `code-critic` agents.
 ### Termination and cost control
 
 - Reviews return **blocking** vs **non-blocking** findings. A review loop ends the moment a
@@ -67,7 +63,7 @@ The critic is always the non-author model:
   still-open findings). This stops the "different issues every round" churn and bounds cost.
 - The Code phase will not pass its gate while the Tests-phase tests fail.
 
-At gates 3 and 5, human feedback runs a bounded fix loop: GPT fixes → Claude reviews once →
+At gates 3 and 5, human feedback runs a bounded fix loop: GPT fixes → host critic reviews once →
 back to the human, until approved.
 
 ---
@@ -80,8 +76,7 @@ Claude Code and Codex expect.
 ```text
 ├── config/
 │   ├── skills/
-│   │   ├── sdd.md                 # Claude-only full orchestrator skill
-│   │   └── sdd-spec.md            # shared Claude/Codex spec-only skill
+│   │   └── sdd.md                 # shared orchestrator skill
 │   ├── agents/
 │   │   ├── plan-critic.md         # plan critic prompt body
 │   │   ├── test-critic.md         # shared critic prompt bodies
@@ -94,17 +89,17 @@ Claude Code and Codex expect.
 └── install.sh
 ```
 
-The TASK state template and the spec structure live inside `config/skills/sdd.md` and
-`config/skills/sdd-spec.md` (the skills write them when scaffolding a task).
+The TASK state template and the spec structure live inside `config/skills/sdd.md`; the
+skill writes them when scaffolding a task.
 
 Install targets:
 
 | Component | Destination |
 | --- | --- |
-| Full orchestrator skill | `~/.claude/skills/sdd/SKILL.md` |
-| Spec-only skill | `~/.claude/skills/sdd-spec/SKILL.md` and `~/.codex/skills/sdd-spec/SKILL.md` |
-| Critic subagents | `~/.claude/agents/<name>.md` |
-| Wrapper + schema | `~/.claude/sdd/` |
+| Orchestrator skill | `~/.claude/skills/sdd/SKILL.md` and `~/.codex/skills/sdd/SKILL.md` |
+| Claude critic agents | `~/.claude/agents/<name>.md` |
+| Codex critic agents | `~/.codex/agents/<name>.toml` |
+| Wrapper + schema | `~/.claude/sdd/` and `~/.codex/sdd/` |
 
 `.sdd/TASK-<branch>.md` (or `.sdd/TASK.md` outside a git repo) is the per-task state file.
 Add `.sdd/` to `.gitignore` — it is scaffolding, not a committed artifact. The two plan
@@ -118,7 +113,8 @@ proves they are needed.
 
 ## Critic Prompts (`config/agents/`)
 
-Shared prompt bodies; `install.sh` adds the Claude subagent frontmatter.
+Shared prompt bodies; `install.sh` adapts them into Claude subagent Markdown and Codex
+custom agent TOML.
 
 - **`plan-critic.md`** — decision-completeness, scope, coverage, and economy for
   GPT-authored test/code plans.
@@ -139,13 +135,14 @@ chmod +x install.sh && ./install.sh
 ```
 
 It is acceptable for this personal dev tool to overwrite prior harness files. The installer
-does not manage hooks, MCP servers, plugins, backups, or uninstall.
+also removes the deprecated `sdd-spec` skill from prior installs. It does not manage hooks,
+MCP servers, plugins, backups, or general uninstall.
 
 ---
 
 ## Usage
 
-For the full Claude workflow, run this in the target workspace:
+Run this in the target workspace from Claude, Codex, or Cursor:
 
 ```text
 /sdd
@@ -156,9 +153,3 @@ Verification Commands, then proceeds. From there it runs to the next gate and st
 your approval or feedback; re-running `/sdd` (even in a new session) resumes from where it
 left off. You will be asked to approve exactly five times: the spec, the test plan, the
 test code, the code plan, and the logic code.
-
-For spec-only work in Claude or Codex, invoke the `sdd-spec` skill. It scaffolds or resumes
-the same `.sdd/TASK-<branch>.md`, writes
-`<repo-root>/specs/<module>/<task-slug>.md`, stops at Gate 1, and does not start Tests or
-Code. After approving Gate 1, switch to Claude Code and run `/sdd` to resume at the Tests
-phase.

@@ -18,6 +18,10 @@ Tests should exercise the interaction seam named by the spec's Architecture and 
 
 **5. Economy and simplicity**
 The default is the simplest test that catches the failure mode — a plain stub or mock, often nothing. Flag low fidelity **only** when a stub or mock is too crude to surface a failure mode the test claims to cover (a real wrong-reason-pass risk, tied to that named failure mode) — never merely because a test "could be higher fidelity." Flag **gratuitous fidelity or complexity** (a recorded fixture or elaborate mock where a simple stub catches the same failure mode). Flag **low economy**: redundant or low-value tests; near-duplicate cases that should instead assert several facets of one exercised call together; a new test that duplicates an existing test's setup or behavior and should have extended it or been a parametrized case; and expensive setup re-run per case that should be a shared, appropriately scoped fixture. Guardrail: do **not** flag tests for keeping *distinct failure modes* in separate tests — that diagnosability is intended — and do not recommend caching that shares mutable state across cases.
+When a class interface or expected output shape changes, flag migration-only assertions that
+only prove renamed structures, old-to-new mapping, transitional adapters, or the absence of
+the old shape. These tests are low value unless they protect an ongoing compatibility
+contract or a concrete user-visible regression risk.
 
 **6. Review Focus areas**
 Give specific attention to whatever the Review Focus calls out.

@@ -30,7 +30,10 @@ For a test-code plan, each planned case must name the failure mode it catches, t
 (unit / integration / acceptance), the interaction seam, the fixture or mock strategy, and
 the assertion that binds to owned behavior. Flag redundant cases, re-testing upstream
 behavior, unnecessary fidelity, monkey-patching that bypasses the intended seam, or expected
-failures that would pass for the wrong reason.
+failures that would pass for the wrong reason. When an interface or output shape changes,
+flag assertions that only prove migration mechanics, renamed structures, old-to-new mapping,
+or transitional adapters unless the plan ties them to an ongoing compatibility contract or
+user-visible regression risk.
 
 **5. Code-plan fit**
 For an implementation plan, the file-change sequence must be minimal and consistent with
