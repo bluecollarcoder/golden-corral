@@ -30,7 +30,9 @@ dependency seam or local pattern should be used.
 The file-change sequence must be minimal and consistent with the intended failing tests.
 Flag interface mismatches with the tests, missing edge cases, risky ordering, broad
 refactors, missed local patterns, unnecessary abstractions/configuration, state scope wider
-than needed, or verification steps that do not prove readiness.
+than needed, missing docstrings for major new or materially changed functions/methods, or
+verification steps that do not prove readiness. Do not require docstrings for trivial private
+helpers or obvious adapters unless local style requires them.
 
 **5. Cross-plan alignment**
 Use the paired test plan as required context. Flag code plans that do not implement the

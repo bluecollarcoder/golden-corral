@@ -130,8 +130,9 @@ to see what GPT actually did.
    preserves dependency injection, reuse, loose coupling, testability, and mockability.
    Address where functionality belongs (class/module/helper/one-off), interaction seams,
    stateful vs stateless behavior, and state scope (global/module/class/closure) when those
-   choices affect tests or blast radius. Prefer existing interfaces, design patterns,
-   helpers, fixtures, and test conventions.
+   choices affect tests or blast radius. Explain non-trivial logic with pseudo-code, not
+   actual implementation code. Prefer existing interfaces, design patterns, helpers,
+   fixtures, and test conventions.
 
    The `Test Strategy` section is a real rubric, not a sentence. It names only the new or
    changed behavior that needs additional coverage, notes existing tests that already cover
@@ -142,7 +143,10 @@ to see what GPT actually did.
    class interface or expected output shape changes, aim tests at the new enduring contract
    and owned failure modes. Avoid migration-only assertions that only prove the old shape,
    adapter, class name, or transitional mapping changed, unless compatibility or
-   user-visible regression risk makes that behavior an ongoing contract.
+   user-visible regression risk makes that behavior an ongoing contract. Do not plan
+   dedicated tests that only prove configuration files load, static assets exist/load, or
+   constants/fixtures parse; those can be incidental setup for behavior tests, but are not
+   standalone coverage.
 
    Before Gate 1, run a scope-control pass. The pass is allowed to delete or narrow spec
    content, acceptance criteria, architecture notes, and test strategy. It should not add new
@@ -151,7 +155,9 @@ to see what GPT actually did.
    goal or an external contract; contradictory requirements; architectural choices that
    increase coupling, global state, or blast radius without need; missed reuse of existing
    patterns, helpers, fixtures, or seams; and test strategies that rely on monkey-patching
-   where ordinary dependency structure would make the code easy to test.
+   where ordinary dependency structure would make the code easy to test. Remove low-value
+   test strategy entries for loading config, loading static assets, or parsing static
+   fixtures unless the user-visible behavior being changed is the loader itself.
 
    Revise the spec before presenting Gate 1. Mention only remaining material risks or
    tradeoffs in the Gate 1 presentation; do not include a QA report when the pass only
@@ -184,16 +190,19 @@ to see what GPT actually did.
    and an assertion that binds to owned behavior and remains valuable after any migration or
    refactor is complete. Require economical case count, reuse-vs-new choices, no upstream
    re-testing, no migration-only assertions unless they protect an ongoing compatibility or
-   user-visible contract, and explicit justification for any monkey-patching of internals,
-   globals, or incidental module state.
+   user-visible contract, no dedicated config/static-asset loading tests, and explicit
+   justification for any monkey-patching of internals, globals, or incidental module state.
 
    Require the code plan to cover: file-change sequence, per-file intent at the function
    level, where functionality belongs (class/module/helper/one-off), stateful vs stateless
    structure, state scope, dependency boundaries, reuse points, coupling tradeoffs, risks, and
-   commands proving readiness. The code plan must respect the test plan's intended seams and
-   must not require rewriting approved tests around the implementation. If the spec's
-   architecture is not testable as written, either plan must call that out instead of hiding
-   it with brittle tests or implementation structure.
+   commands proving readiness. Require docstrings for major new or materially changed
+   functions and methods: public APIs, orchestration entrypoints, complex helpers, and
+   behavior whose purpose or side effects are not obvious from the signature. The code plan
+   must respect the test plan's intended seams and must not require rewriting approved tests
+   around the implementation. If the spec's architecture is not testable as written, either
+   plan must call that out instead of hiding it with brittle tests or implementation
+   structure.
 
    Read both plans from disk. Invoke `test-plan-critic` on the test plan with the code plan as
    context, then invoke `code-plan-critic` on the code plan with the test plan as context.
@@ -208,8 +217,9 @@ to see what GPT actually did.
    specifies; stub/mock collaborators through stable dependency seams to create the condition
    (or load a high-fidelity fixture only where the plan justified one); do not patch
    internals/globals/incidental module state when the approved architecture provides a normal
-   seam; keep each test at its chosen level and within the task's ownership boundary. Then
-   loop:
+   seam; keep each test at its chosen level and within the task's ownership boundary; prune
+   generated tests that duplicate existing coverage or only prove config/static-asset
+   loading. Then loop:
    run the test command
    (deterministic check — the important new tests must **fail for the behavioral reason**,
    not infra; a premature pass is itself a blocking finding); invoke `test-critic` with the
@@ -222,7 +232,9 @@ to see what GPT actually did.
    files to write). Instruct GPT to follow the approved architecture and code plan, preserve
    the smallest practical blast radius, reuse existing patterns/utilities, avoid opportunistic
    abstractions or refactors, and keep dependency injection, state scope, and interaction
-   seams testable. Then loop: run the full verification (test → lint → typecheck → build) —
+   seams testable. Major new or materially changed functions and methods must have useful
+   docstrings unless they are trivial private helpers or local style clearly omits them. Then
+   loop: run the full verification (test → lint → typecheck → build) —
    the Build-phase tests must pass; any failing command is a blocking finding GPT must fix
    before review. Once green, invoke `code-critic` with spec + plans + tests + impl +
    verification output as a review round; have GPT `fix` blocking findings (diff-scoped after
