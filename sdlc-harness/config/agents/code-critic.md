@@ -21,7 +21,9 @@ details are not obvious from the signature. Do not require docstrings for trivia
 helpers or obvious adapters unless local style requires them.
 
 **5. Verification alignment**
-Does the verification output support the claimed readiness? Flag: test commands that ran a different set of tests than expected, lint warnings that were suppressed rather than fixed, typecheck errors that were cast away, and build output with warnings that indicate real problems.
+Does the verification output support the claimed readiness? For the repo-defined checks that
+ran, flag commands that exercised a different scope than expected, failures or warnings that
+were suppressed rather than fixed, and output that indicates a real problem.
 
 Output format:
 
@@ -36,8 +38,7 @@ Non-blocking findings (worth fixing but not merge-blocking):
 
 Verification summary:
 - Tests: [pass/fail, coverage notes]
-- Lint: [pass/fail, notable warnings]
-- Typecheck/build: [pass/fail]
+- Additional verification commands: [command + pass/fail]
 
 Open questions:
 - [question]

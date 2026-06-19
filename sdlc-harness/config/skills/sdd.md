@@ -174,8 +174,8 @@ to see what GPT actually did.
    interaction with it. Search for existing tests covering the same unit/area and note which
    could be extended versus where a new test is warranted; also find reusable fixtures,
    factories, mocks, dependency-injection points, local mocking conventions, implementation
-   targets, import styles, reusable utilities, state boundaries, and the verification loop
-   order (test → lint → typecheck → build). Confirm the test command and what a meaningful
+   targets, import styles, reusable utilities, state boundaries, and the repo-defined
+   verification commands and their order. Confirm the test command and what a meaningful
    failure looks like. Check `Research`.
 2. **Plan build** (GPT → you 1 round per critic). Prompt GPT via `build` to author a paired,
    decision-complete build plan and write two separate files:
@@ -234,9 +234,9 @@ to see what GPT actually did.
    abstractions or refactors, and keep dependency injection, state scope, and interaction
    seams testable. Major new or materially changed functions and methods must have useful
    docstrings unless they are trivial private helpers or local style clearly omits them. Then
-   loop: run the full verification (test → lint → typecheck → build) —
-   the Build-phase tests must pass; any failing command is a blocking finding GPT must fix
-   before review. Once green, invoke `code-critic` with spec + plans + tests + impl +
+   loop: run every applicable command recorded under `Verification Commands` in its stated
+   order — the Build-phase tests must pass; any failing command is a blocking finding GPT
+   must fix before review. Once green, invoke `code-critic` with spec + plans + tests + impl +
    verification output as a review round; have GPT `fix` blocking findings (diff-scoped after
    round 1), up to 3 rounds. Stop early on zero blockers; at the cap, escalate. Check `Build
    logic`.
@@ -267,9 +267,7 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 
 ## Verification Commands
 - Test:
-- Lint:
-- Typecheck:
-- Build:
+- Additional repo-defined commands:
 
 ## Artifacts
 - Spec: `specs/<module>/<task-slug>.md`
