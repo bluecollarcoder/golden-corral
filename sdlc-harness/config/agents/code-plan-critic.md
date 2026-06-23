@@ -14,10 +14,10 @@ missing owned behavior, invented scope, or work that belongs to an upstream comp
 future task.
 
 **2. Decision completeness**
-The implementation author should know exactly which files to touch, what behavior each
-change implements, which commands to run, and what result shape is expected. Flag vague
-steps, unresolved choices, missing file targets, or acceptance criteria that are not mapped
-to planned code work.
+The implementation author should know the planned scope/files where they are knowable, what
+behavior each change implements, which commands to run, and what result shape is expected.
+Flag vague steps, unresolved choices, missing scope, missing likely file targets, or
+acceptance criteria that are not mapped to planned code work.
 
 **3. Architecture and testability fit**
 The code plan must honor the spec's Architecture and Testability decisions, or explicitly
@@ -30,9 +30,12 @@ dependency seam or local pattern should be used.
 The file-change sequence must be minimal and consistent with the intended failing tests.
 Flag interface mismatches with the tests, missing edge cases, risky ordering, broad
 refactors, missed local patterns, unnecessary abstractions/configuration, state scope wider
-than needed, missing docstrings for major new or materially changed functions/methods, or
-verification steps that do not prove readiness. Do not require docstrings for trivial private
-helpers or obvious adapters unless local style requires them.
+than needed, missing documentation intent for public and major new or materially changed
+classes/functions/methods, or verification steps that do not prove readiness. Documentation
+intent should cover the non-obvious maintenance details: purpose, important inputs/outputs,
+side effects, invariants, or error behavior. Do not require docstrings for trivial private
+helpers, simple accessors, obvious adapters, short obvious functions, or cases where the
+docstring would be longer than the implementation without adding maintenance value.
 
 **5. Cross-plan alignment**
 Use the paired test plan as required context. Flag code plans that do not implement the

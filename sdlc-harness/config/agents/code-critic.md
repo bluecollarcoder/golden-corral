@@ -15,10 +15,13 @@ Flag: queries or operations inside loops that should be batched; unbounded growt
 
 **4. Architecture, testability, and maintainability**
 Flag: names that don't match the spec's vocabulary (makes future spec-to-code tracing harder); code structure that conflicts with the spec's Architecture and Testability decision; abstractions that are too thin (wrapping one line) or too fat (doing too many things); functionality placed in the wrong class/module/helper/one-off location for reuse or coupling; hidden dependencies instead of dependency injection; state scope wider than needed (global/module/singleton state where class/closure/local state would do); logic that is duplicated rather than shared; seams that make tests rely on monkey-patching internals/globals; magic constants without explanation; and changes whose blast radius extends further than the spec intended.
-Also flag major new or materially changed functions and methods that lack useful docstrings
-explaining purpose, important inputs/outputs, side effects, or failure behavior where those
-details are not obvious from the signature. Do not require docstrings for trivial private
-helpers or obvious adapters unless local style requires them.
+Also flag public and major new or materially changed classes, functions, and methods that
+lack useful docstrings explaining purpose, important inputs/outputs, side effects,
+invariants, or failure behavior where those details are not obvious from the signature and
+local context. A one-sentence summary is insufficient for these surfaces when it omits
+maintenance-relevant behavior. Do not require docstrings for trivial private helpers, simple
+accessors, obvious adapters, short obvious functions, or cases where the docstring would be
+longer than the implementation without adding maintenance value.
 
 **5. Verification alignment**
 Does the verification output support the claimed readiness? For the repo-defined checks that

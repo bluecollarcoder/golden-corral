@@ -108,10 +108,12 @@ round — not to re-derive the whole list. Reuse finding ids across rounds for p
 `.sdd/_codex-prompt<branch>.md`), then:
 - Plan, test, or code authoring: `<sdd-codex-wrapper> build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
 - Applying blocking fixes: `<sdd-codex-wrapper> fix .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
-Each GPT prompt must include the relevant context inline or by file path (spec path, plan,
-the open findings, and exactly which files to write). For plans, tell GPT to write the
-exact `.sdd/PLAN-*<branch>.md` file. After a build/fix, read the changed files from disk
-to see what GPT actually did.
+Each GPT prompt must include the relevant context inline or by file path: the spec, the
+relevant `.sdd/PLAN-*<branch>.md` file(s), open findings when fixing, and the planned scope.
+Name expected files when known, but allow GPT to report necessary deviations instead of
+treating the initial file list as exhaustive. For plans, tell GPT to write the exact
+`.sdd/PLAN-*<branch>.md` file. After a build/fix, read the changed files from disk to see
+what GPT actually did.
 
 ## The phases
 
@@ -196,13 +198,16 @@ to see what GPT actually did.
    Require the code plan to cover: file-change sequence, per-file intent at the function
    level, where functionality belongs (class/module/helper/one-off), stateful vs stateless
    structure, state scope, dependency boundaries, reuse points, coupling tradeoffs, risks, and
-   commands proving readiness. Require docstrings for major new or materially changed
-   functions and methods: public APIs, orchestration entrypoints, complex helpers, and
-   behavior whose purpose or side effects are not obvious from the signature. The code plan
-   must respect the test plan's intended seams and must not require rewriting approved tests
-   around the implementation. If the spec's architecture is not testable as written, either
-   plan must call that out instead of hiding it with brittle tests or implementation
-   structure.
+   commands proving readiness. Require useful documentation for new or materially changed
+   public and major surfaces: public APIs, classes, orchestration entrypoints, complex
+   helpers, and behavior whose purpose, inputs, outputs, side effects, invariants, or error
+   behavior are not obvious from the signature and local context. Do not require docstrings
+   for trivial private helpers, simple accessors, short obvious functions, or cases where the
+   docstring would be longer than the implementation without adding maintenance value. The
+   code plan must respect the test plan's intended seams and must not require rewriting
+   approved tests around the implementation. If the spec's architecture is not testable as
+   written, either plan must call that out instead of hiding it with brittle tests or
+   implementation structure.
 
    Read both plans from disk. Invoke `test-plan-critic` on the test plan with the code plan as
    context, then invoke `code-plan-critic` on the code plan with the test plan as context.
@@ -211,15 +216,13 @@ to see what GPT actually did.
 3. **GATE 2.** Present both plans plus `test-plan-critic` and `code-plan-critic`
    non-blocking findings; approve or feedback.
 4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
-   (prompt = spec + approved test plan + approved code plan + exact files to write).
-   Instruct GPT to follow the plan's level, seam, and mechanism per case: favor simple,
-   maintainable, economical tests; reuse existing tests/fixtures/helpers as the plan
-   specifies; stub/mock collaborators through stable dependency seams to create the condition
-   (or load a high-fidelity fixture only where the plan justified one); do not patch
-   internals/globals/incidental module state when the approved architecture provides a normal
-   seam; keep each test at its chosen level and within the task's ownership boundary; prune
-   generated tests that duplicate existing coverage or only prove config/static-asset
-   loading. Then loop:
+   (prompt = spec + approved test plan + approved code plan for seam context + planned
+   scope/files when known + test command). Instruct GPT to implement the approved test plan
+   without production behavior changes, keep changes within the planned scope, and report
+   necessary deviations. After writing tests, GPT must perform a refinement pass: remove,
+   merge, narrow, or simplify tests that are duplicative, too broad for the owned behavior,
+   setup-only, upstream-owned, or migration-only. The remaining tests should be the smallest
+   maintainable set that proves the approved owned failure modes. Then loop:
    run the test command
    (deterministic check — the important new tests must **fail for the behavioral reason**,
    not infra; a premature pass is itself a blocking finding); invoke `test-critic` with the
@@ -228,12 +231,15 @@ to see what GPT actually did.
    the cap, escalate. Record the test command output as evidence. Check `Build test code`.
 5. **Build logic** (GPT → you ≤3 rounds). Start only after test code has zero blocking
    `test-critic` findings and the important new tests fail for the right reason. GPT authors
-   the implementation via `build` (prompt = spec + approved plans + approved tests + exact
-   files to write). Instruct GPT to follow the approved architecture and code plan, preserve
-   the smallest practical blast radius, reuse existing patterns/utilities, avoid opportunistic
-   abstractions or refactors, and keep dependency injection, state scope, and interaction
-   seams testable. Major new or materially changed functions and methods must have useful
-   docstrings unless they are trivial private helpers or local style clearly omits them. Then
+   the implementation via `build` (prompt = spec + approved code plan + approved test plan +
+   approved tests + planned scope/files when known + TASK verification commands). Instruct
+   GPT to implement the approved code plan, satisfy the approved tests, keep changes within
+   the planned scope, report necessary deviations, and avoid weakening or rewriting approved
+   tests to obtain a pass. Public and major new or materially changed classes, functions, and
+   methods must have useful docstrings where their purpose, inputs, outputs, side effects,
+   invariants, or error behavior are not obvious from the signature and local context. Use
+   the repository's docstring convention and include only sections that add maintenance
+   value; do not add boilerplate that is longer than simple code it merely restates. Then
    loop: run every applicable command recorded under `Verification Commands` in its stated
    order — the Build-phase tests must pass; any failing command is a blocking finding GPT
    must fix before review. Once green, invoke `code-critic` with spec + plans + tests + impl +
@@ -244,6 +250,24 @@ to see what GPT actually did.
    output, and findings; approve or feedback. **Feedback loop:** GPT fixes → relevant host
    critic reviews once (`test-critic` for test changes, `code-critic` for logic changes, both
    if needed) → re-present; repeat until approved. On approval, the task is complete.
+
+## Documentation guidance
+
+Use the target repository's documentation style and language. For public and major classes,
+functions, and methods, include only the relevant parts of this template:
+
+```text
+Summary: responsibility and owned behavior.
+Parameters/inputs: important shape, constraints, and meanings.
+Returns/outputs: result shape and important semantics.
+Raises/errors: expected failures and why.
+Side effects: state mutation, IO, network calls, logging, emitted events, or persistence.
+Invariants/notes: non-obvious assumptions, lifecycle, dependency, or testing considerations.
+```
+
+Omit sections that are obvious or irrelevant. Do not require docstrings for trivial private
+helpers, simple accessors, short obvious functions, or documentation that would be longer
+than the implementation without adding maintenance value.
 
 ## Gate presentation (every gate)
 

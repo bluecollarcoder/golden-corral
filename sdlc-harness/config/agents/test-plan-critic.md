@@ -14,19 +14,20 @@ missing owned behavior, invented scope, or tests for behavior that belongs to an
 component or future task.
 
 **2. Decision completeness**
-The test author should know exactly which files to touch, what each case proves, which
-commands to run, and what failure shape is expected before implementation exists. Flag vague
-steps, unresolved choices, missing file targets, or acceptance criteria that are not mapped
-to planned test work.
+The test author should know the planned scope/files where they are knowable, what each case
+proves, which commands to run, and what failure shape is expected before implementation
+exists. Flag vague steps, unresolved choices, missing scope, missing likely file targets, or
+acceptance criteria that are not mapped to planned test work.
 
 **3. Test strategy fit**
 Each planned case must name the failure mode it catches, the level (unit / integration /
 acceptance), the interaction seam, the fixture or mock strategy, and the assertion that
-binds to owned behavior. Flag redundant cases, re-testing upstream behavior, unnecessary
-fidelity, monkey-patching that bypasses the intended seam, expected failures that would pass
-for the wrong reason, or dedicated tests that only prove configuration files load, static
-assets exist/load, or constants/fixtures parse. Config/static assets can be incidental setup
-for behavior tests, but are not standalone coverage unless the owned behavior is the loader.
+binds to owned behavior. Flag redundant cases, excessive case count, re-testing upstream
+behavior, unnecessary fidelity, monkey-patching that bypasses the intended seam, expected
+failures that would pass for the wrong reason, or dedicated tests that only prove
+configuration files load, static assets exist/load, or constants/fixtures parse.
+Config/static assets can be incidental setup for behavior tests, but are not standalone
+coverage unless the owned behavior is the loader.
 
 **4. Architecture and testability fit**
 The test plan must honor the spec's Architecture and Testability decisions, or explicitly
@@ -65,6 +66,7 @@ Open questions:
 A finding is blocking if the next author would have to guess, if an owned failure mode is
 uncovered, if the plan exceeds the spec's ownership boundary, if following the plan could
 produce tests that pass for the wrong reason, if the plan includes low-value standalone
-config/static-asset loading coverage, or if the planned test structure materially harms
-dependency injection, testability, mockability, or blast radius. [FAIL] if there are blocking
-findings. [PASS] only if the test plan is ready for the next author and the human gate.
+config/static-asset loading coverage, if the case count is materially broader than needed to
+prove the owned failure modes, or if the planned test structure materially harms dependency
+injection, testability, mockability, or blast radius. [FAIL] if there are blocking findings.
+[PASS] only if the test plan is ready for the next author and the human gate.
