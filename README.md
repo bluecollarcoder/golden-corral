@@ -16,14 +16,20 @@ to work safely while keeping the human in control at a few decisive moments.
 
 ## Core Ideas
 
-- **Spec first:** write down the intended behavior before tests or code.
+- **Requirements become a technical specification:** the SDD orchestrator uses AI-assisted
+  repository research to translate a ticket, PRD, or detailed human instructions into a
+  concrete technical specification before planning begins.
+- **Plan before coding:** the delegated author produces decision-complete plans from the
+  approved specification, and the human approves those plans before any tests or production
+  code are written.
+- **Separate test and code plans:** the test plan defines the cases, expected failure reasons,
+  seams, fixtures, and test commands; the code plan separately defines production changes,
+  affected files, sequencing, and verification. Keeping both explicit makes their alignment
+  reviewable without collapsing testing into implementation.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
-- **Cross-model review:** the model that authors an artifact is never the model that
-  reviews it. The host orchestrator reviews through local critic agents; a delegated
-  author returns plans and edits tests and code through Codex or Cursor.
-- **Deterministic checks before critique:** run tests, linters, type checks, or builds
-  before asking a model to review.
+- **Cross-model review:** when practical, SDD uses a different model to critique an
+  artifact than the one that authored it.
 - **Start once, stop at the gates:** the `sdd` skill drives the whole flow and pauses only
   at three human approval gates:
 
@@ -69,41 +75,43 @@ SDD workflow records.
 3. **Research the specification:** inspect the source document, affected code, contracts,
    dependencies, risks, existing patterns, and test seams; resolve material questions with
    the human.
-4. **Write the specification:** the host writes the behavioral contract, acceptance criteria,
-   architecture and testability decisions, and test strategy, then narrows unnecessary scope.
+4. **Write the specification:** the orchestrator writes the behavioral contract, acceptance
+   criteria, architecture and testability decisions, and test strategy, then narrows
+   unnecessary scope.
 5. **Gate 1 — approve the spec:** the human approves the specification or gives feedback for
-   another host revision.
+   another orchestrator revision.
 6. **Research the build:** map acceptance criteria to failure modes, implementation targets,
    existing tests and fixtures, dependency seams, and repository verification commands.
 7. **Create and review plans:** the delegated author returns paired test and code plans. The
-   host persists them, runs the plan critics, and requests one correction when blocking
-   findings remain.
+   orchestrator persists them, runs the plan critics, and requests one correction when
+   blocking findings remain.
 8. **Gate 2 — approve the plans:** the human approves both plans or requests another planning
    pass.
 9. **Build the tests:** the delegated author writes the planned tests without production
-   changes. The host proves the important tests fail for the intended behavioral reason and
-   runs `test-critic`; blocking findings enter a correction loop of at most three rounds.
+   changes. The orchestrator proves the important tests fail for the intended behavioral
+   reason and runs `test-critic`; blocking findings enter a correction loop of at most three
+   rounds.
 10. **Build the logic:** after the tests have no blocking findings and fail correctly, the
-   delegated author implements the code plan. The host runs the complete verification suite
-   and `code-critic`, with another correction loop of at most three rounds.
+   delegated author implements the code plan. The orchestrator runs the complete verification
+   suite and `code-critic`, with another correction loop of at most three rounds.
 11. **Gate 3 — approve the build:** the human reviews the tests, implementation, deterministic
    evidence, and remaining non-blocking findings. Feedback repeats the relevant correction and
    critic loop until approval completes the task.
 
-The critic is always the non-author model:
+The workflow assigns authors and critics as follows:
 
 | Phase | Author | AI critic | Human gate |
 |-------|--------|-----------|------------|
-| Spec | host orchestrator | — | **1. Spec approved** |
-| Build plans | delegated author | host `test-plan-critic` + `code-plan-critic` (1 round each) | **2. Build plans approved** |
-| Test code | delegated author | host `test-critic` (≤3 rounds) | — |
-| Logic code | delegated author | host `code-critic` (≤3 rounds) | **3. Build approved** |
+| Spec | SDD orchestrator | — | **1. Spec approved** |
+| Build plans | delegated author | `test-plan-critic` + `code-plan-critic` (1 round each) | **2. Build plans approved** |
+| Test code | delegated author | `test-critic` (≤3 rounds) | — |
+| Logic code | delegated author | `code-critic` (≤3 rounds) | **3. Build approved** |
 
 - Delegated author calls go through `config/lib/sdd-codex.sh` or
   `config/lib/sdd-cursor.sh`. Codex is the default; a human instruction switches the TASK
   to Cursor until changed again.
-- The host reviews the delegated author's plans and code with bootstrapped `test-plan-critic`,
-  `code-plan-critic`, `test-critic`, and `code-critic` agents.
+- The orchestrator reviews the delegated author's plans and code with installed
+  `test-plan-critic`, `code-plan-critic`, `test-critic`, and `code-critic` agents.
 
 ### Termination and cost control
 
@@ -119,7 +127,7 @@ The critic is always the non-author model:
   fail.
 
 At the final Build gate, human feedback runs a bounded fix loop: delegated author fixes →
-the relevant host critic reviews once → back to the human, until approved.
+the relevant critic agent reviews once → back to the human, until approved.
 
 ---
 
@@ -232,15 +240,15 @@ final message.
 
 ### Shared context boundary
 
-Every delegated call starts fresh. The host includes the complete approved spec and, after
-planning, both complete plans inline in every implementation or correction prompt. Repository
-source and test files remain available by path. PLAN and TASK files are never loaded from
-`.sdd` by a delegate.
+Every delegated call starts fresh. The orchestrator includes the complete approved spec and,
+after planning, both complete plans inline in every implementation or correction prompt.
+Repository source and test files remain available by path. PLAN and TASK files are never
+loaded from `.sdd` by a delegate.
 
 For plan creation or correction, the delegated author returns complete test and code plans in
-two delimited response sections. The host validates those sections and writes the branch-scoped
-PLAN files. For implementation, the delegate edits repository tests or production code
-directly; only the host updates `.sdd` state.
+two delimited response sections. The orchestrator validates those sections and writes the
+branch-scoped PLAN files. For implementation, the delegate edits repository tests or
+production code directly; only the orchestrator updates `.sdd` state.
 
 ### Codex
 
@@ -252,12 +260,11 @@ Invoke the installed Codex wrapper with:
 
 Set `SDD_CODEX_MODEL` to request a specific model; when unset, Codex chooses its configured
 default. Each call is ephemeral and uses a permission profile that denies delegated reads and
-writes to the complete `.sdd` subtree. The wrapper opens prompt and response files on the host
-side. It intentionally does not pass `--sandbox`, because legacy sandbox settings take
-precedence over permission
-profiles. A loaded Codex configuration that sets `sandbox_mode` or
-`[sandbox_workspace_write]` is therefore incompatible with this boundary and should be
-migrated to permission profiles.
+writes to the complete `.sdd` subtree. The wrapper opens the prompt and response files before
+launching the delegated process. It intentionally does not pass `--sandbox`, because legacy
+sandbox settings take precedence over permission profiles. A loaded Codex configuration that
+sets `sandbox_mode` or `[sandbox_workspace_write]` is therefore incompatible with this
+boundary and should be migrated to permission profiles.
 
 ### Cursor
 
@@ -271,7 +278,7 @@ repository root as its workspace:
 
 Set `SDD_CURSOR_MODEL` to request a specific model; when unset, Cursor chooses its default.
 The wrapper uses Bubblewrap to give only the delegated process an empty, read-only `.sdd`, while
-interactive Cursor and other host agents retain normal access to the real directory. Cursor's
+interactive Cursor and other agents retain normal access to the real directory. Cursor's
 own sandbox and unattended approval remain enabled inside that boundary. The wrapper refuses
 tracked or symlinked TASK state and supports only Cursor's default editing Agent mode, not
 `plan` or `ask` modes.
