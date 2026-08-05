@@ -1,59 +1,39 @@
 ---
 name: sdd
-description: Run the full Spec-Driven Development workflow for high-risk work end to end in Claude, Codex, or Cursor after or including the Spec phase. It drives Spec -> Build, pausing only at the 3 human approval gates, and resumes from .sdd/TASK state on re-invocation. GPT is reached through the codex CLI, and each host bootstraps its own critic agents.
-disable-model-invocation: true
+description: Run the full Spec-Driven Development workflow when the human explicitly invokes /sdd in Claude, Codex, or Cursor. It drives Spec through Build, delegates plan and implementation authoring to Codex or Cursor, has 3 human approval gates, and resumes from .sdd/TASK state.
 ---
 
 You are the host orchestrator for a high-risk Spec-Driven Development task in Claude,
 Codex, or Cursor. The human starts this skill once and may resume it in any supported host.
-You drive the workflow through Build and **stop only at the 3 human gates**. You
-are resumable: all progress lives in the TASK file, so a fresh session re-reads it and
-continues from the first incomplete item.
+You drive the workflow through Build and pause for approval only at the 3 human gates.
+Missing required input, unavailable tooling, and review-cap escalation may also block work.
+Resume state lives in the TASK file, so a fresh session re-reads it and continues from the
+first incomplete item.
 
 ## Roles (the critic is always the non-author model)
 
 | Artifact | Author | AI critic |
 |----------|--------|-----------|
 | Spec | Host orchestrator | — (human only) |
-| Test plan | GPT | host `test-plan-critic`, 1 round |
-| Code plan | GPT | host `code-plan-critic`, 1 round |
-| Test code | GPT | host `test-critic`, ≤3 rounds |
-| Logic code | GPT | host `code-critic`, ≤3 rounds |
+| Test plan | Delegated author | host `test-plan-critic`, 1 round |
+| Code plan | Delegated author | host `code-plan-critic`, 1 round |
+| Test code | Delegated author | host `test-critic`, ≤3 rounds |
+| Logic code | Delegated author | host `code-critic`, ≤3 rounds |
 
-- You reach **GPT** through the host-local installed `sdd-codex.sh` wrapper (it calls
-  `codex exec`): `~/.claude/sdd/sdd-codex.sh` in Claude, `~/.codex/sdd/sdd-codex.sh` in
-  Codex, or the active underlying host path in Cursor. If no wrapper is available, stop
-  before calling GPT and tell the human which wrapper path is missing.
-- You review **GPT's test plan** with the host-local `test-plan-critic` agent, **GPT's
-  code plan** with the host-local `code-plan-critic` agent, **GPT's tests** with the
-  host-local `test-critic` agent, and **GPT's implementation** with the host-local
-  `code-critic` agent.
-- When a phase says to invoke a critic, dispatch or spawn that named host-local critic
-  agent, provide the artifact plus required context, wait for its result, and use that
-  result as the review output.
+- The TASK file records `Delegated author: Codex` or `Delegated author: Cursor`. Default to
+  Codex when scaffolding a task or reading an older TASK file without this field. If the
+  human instructs you to switch, update the field before the next delegated call.
+- Reach the delegated author through the installed host-local `sdd-codex.sh` or
+  `sdd-cursor.sh` wrapper. If the selected wrapper is unavailable, stop before delegation
+  and tell the human which wrapper is missing.
+- When a phase says to invoke a critic, use the current host's native sub-agent mechanism
+  to dispatch or spawn that named critic, provide the artifact plus required context, wait
+  for its result, and use that result as the review output.
+- If a named critic is unavailable through that mechanism, stop before Build work and tell
+  the human to reinstall the SDD harness.
 - You never let an author review its own artifact — that defeats the cross-model check.
 - You must not replace these critic agents with inline review. Inline review is only an
   explicit emergency/manual workaround if the human asks for it.
-
-## Critic bootstrap
-
-Before any Build Phase step that invokes `test-plan-critic`, `code-plan-critic`,
-`test-critic`, or `code-critic`, ensure the current host has those four critic agents
-available:
-
-- Claude: `~/.claude/agents/test-plan-critic.md`, `~/.claude/agents/code-plan-critic.md`,
-  `~/.claude/agents/test-critic.md`, and `~/.claude/agents/code-critic.md`.
-- Codex: `~/.codex/agents/test-plan-critic.toml`,
-  `~/.codex/agents/code-plan-critic.toml`, `~/.codex/agents/test-critic.toml`, and
-  `~/.codex/agents/code-critic.toml`.
-- Cursor: use the active underlying Claude or Codex host path available in the current
-  environment; do not require a separate Cursor-specific command or rules install.
-
-The installed critic agents are generated from the shared prompt bodies in
-`config/agents/*.md`. If the required critic agents are missing and the source prompt bodies
-are available, create the missing host-local agent files before continuing. If the source
-prompt bodies are not available or the host cannot create agent files, stop before Build
-work and tell the human exactly which critic setup is missing.
 
 ## Resolve the TASK file
 
@@ -67,16 +47,20 @@ work and tell the human exactly which critic setup is missing.
 - The spec file is always `<root>/specs/<module>/<task-slug>.md`; pick the existing
   `specs/` subfolder that matches the affected area, or create the obvious domain folder.
   Never write the spec relative to the current working directory.
-- Throughout, "TASK file" means this path. Suggest the human add `.sdd/` to `.gitignore`.
+- Throughout, "TASK file" means this path.
 
-## If the TASK file is missing — scaffold, then stop
+## If the TASK file is missing — scaffold and continue
 
-Create `.sdd/`, write the TASK file from the template at the end of this skill, filling in
-what you can infer from the chat, branch, and repo. Substitute the `<branch>` and
-`<task-slug>` placeholders with their resolved values as you write it. Then run a short Context bootstrap:
+Start from either a linked ticket/PRD or detailed instructions in the human's prompt. If
+neither provides enough information to state the goal and scope, ask for the missing source
+before scaffolding. Create `.sdd/`, suggest adding it to `.gitignore`, and write the TASK file
+from the template at the end of this skill, filling in what you can infer from the source,
+chat, branch, and repo. Substitute the `<branch>` and `<task-slug>` placeholders with their
+resolved values as you write it. Then run a short Context bootstrap:
 ask only the questions needed to complete the Context and Verification Commands sections
-(numbered, answerable inline). **Do not start the workflow until Context has no unresolved
-`Question:` placeholders.** Once the human answers, update the TASK file and continue.
+(numbered, answerable inline). If there are no unresolved `Question:` placeholders, continue
+directly into the workflow. Otherwise, wait for the answers, update the TASK file, and then
+continue.
 
 ## Each invocation — find the resume point
 
@@ -89,36 +73,59 @@ do not proceed without explicit human approval in a later message. Announce on e
 A GATE checkbox is checked **only** after the human approves. Step checkboxes you may check
 once the step's output exists.
 
+The TASK file is host-owned durable state. Only the host orchestrator may update it.
+
 ## Shared loop mechanics
 
 **Findings format.** Every AI review produces `PASS|FAIL` and findings split into
 blocking and non-blocking. Critic agents use their prompt-specific text format.
 
-**Blocking gate = "good enough".** A review round ends the loop early the moment it returns
-**zero blocking findings**. Otherwise the loop continues up to its cap (1 round for plans,
-3 for code), then you **stop and escalate to the human** with the open blockers listed.
-Only **blocking** findings trigger another author edit. Non-blocking findings are carried
-to the human at the gate, not auto-fixed.
+**Blocking gate = "good enough".** Code review ends early on **zero blocking findings**.
+Otherwise it continues for up to 3 rounds, then stops and escalates to the human with the
+open blockers. Only blocking findings trigger another author edit; carry non-blocking
+findings to the human instead of auto-fixing them. Plans receive one review per critic. If
+either critic reports blockers, correct the plans once and present the replacements at Gate
+2 without another AI verdict; do not claim that the original findings were verified as
+resolved.
 
-**Anti-churn.** Round 1 reviews the whole artifact. Rounds 2–3 are **diff-scoped**: tell
-the reviewer to look only at what changed plus the still-open findings from the prior
-round — not to re-derive the whole list. Reuse finding ids across rounds for persistence.
+**Anti-churn.** Code review round 1 reviews the whole artifact. Rounds 2–3 are
+**diff-scoped**: tell the reviewer to look only at what changed plus the still-open findings
+from the prior round — not to re-derive the whole list. Reuse finding ids across rounds for
+persistence.
 
-**Calling GPT.** Write the prompt to a branch-scoped scratch file under `.sdd/` (e.g.
-`.sdd/_codex-prompt<branch>.md`), then:
-- Plan, test, or code authoring: `<sdd-codex-wrapper> build .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
-- Applying blocking fixes: `<sdd-codex-wrapper> fix .sdd/_codex-prompt<branch>.md .sdd/_codex-msg<branch>.md`
-Each GPT prompt must include the relevant context inline or by file path: the spec, the
-relevant `.sdd/PLAN-*<branch>.md` file(s), open findings when fixing, and the planned scope.
-Name expected files when known, but allow GPT to report necessary deviations instead of
-treating the initial file list as exhaustive. For plans, tell GPT to write the exact
-`.sdd/PLAN-*<branch>.md` file. After a build/fix, read the changed files from disk to see
-what GPT actually did.
+**Calling the delegated author.** Write the prompt to a branch-scoped scratch file under
+`.sdd/` (e.g. `.sdd/_author-prompt<branch>.md`), then call the backend recorded in the TASK:
+- Codex: `<sdd-codex-wrapper> .sdd/_author-prompt<branch>.md .sdd/_author-msg<branch>.md`
+- Cursor: `<sdd-cursor-wrapper> .sdd/_author-prompt<branch>.md .sdd/_author-msg<branch>.md`
+
+The wrappers open the prompt and response files on the host side. The delegated process has
+no access to `.sdd`; do not include the TASK file, its path, critic identities, verdicts,
+rounds, or review history in a delegated prompt. When asking for corrections, translate
+blocking findings into plain required changes.
+
+Every delegated call starts with fresh context. Include the complete approved spec inline in
+every Build-phase prompt. After plans exist, include both complete plans inline in every
+plan-correction, test-authoring, implementation, and correction prompt. Include current
+failure output and required changes on corrections. Refer to repository source and test files
+by path instead of copying them unless an exact excerpt is necessary. Name planned repository
+scope and verification commands when known.
+
+Ask the author to report only changed files, verification commands and results, blockers,
+and necessary scope deviations. After an implementation call, inspect the changed files
+rather than relying on its report.
+
+**Plan response contract.** A plan author cannot write `.sdd`. Require its response to contain
+exactly two complete documents delimited by `BEGIN TEST PLAN` / `END TEST PLAN` and
+`BEGIN CODE PLAN` / `END CODE PLAN`. Reject a missing, empty, duplicated, or out-of-order
+section. The host writes the validated bodies to `PLAN-tests<branch>.md` and
+`PLAN-code<branch>.md`. On a plan correction, send the complete spec and both current plans,
+require both complete replacement documents, preserve an unaffected plan verbatim, validate
+the response again, and let only the host replace the plan files.
 
 ## The phases
 
 ### Spec phase
-1. **Research** (you + human). Read the linked request in full. Find affected files, APIs,
+1. **Research** (you + human). Read the source request in full. Find affected files, APIs,
    schemas, configs, downstream dependencies, existing design patterns, and test seams. Note
    prior decisions, risks, and open questions. Collaborate with the human to resolve intent.
    Output: Detected state | Key findings | Architecture/testability constraints | Open
@@ -136,30 +143,18 @@ what GPT actually did.
    actual implementation code. Prefer existing interfaces, design patterns, helpers,
    fixtures, and test conventions.
 
-   The `Test Strategy` section is a real rubric, not a sentence. It names only the new or
-   changed behavior that needs additional coverage, notes existing tests that already cover
-   unchanged behavior when relevant, and uses the cheapest effective test level. For each
-   failure mode, name ownership here vs upstream, test level (unit / integration /
-   acceptance), rough sizing per level, and any specific failure mode that justifies a
-   high-fidelity fixture or mock. Default otherwise to the simplest good-enough stub. When a
-   class interface or expected output shape changes, aim tests at the new enduring contract
-   and owned failure modes. Avoid migration-only assertions that only prove the old shape,
-   adapter, class name, or transitional mapping changed, unless compatibility or
-   user-visible regression risk makes that behavior an ongoing contract. Do not plan
-   dedicated tests that only prove configuration files load, static assets exist/load, or
-   constants/fixtures parse; those can be incidental setup for behavior tests, but are not
-   standalone coverage.
+   The `Test Strategy` is a per-failure-mode rubric covering ownership, test level, rough
+   sizing, and the simplest effective seam and fixture. Target enduring owned behavior; do
+   not add upstream, migration-only, or config/static-asset loading coverage unless it
+   protects an ongoing user-visible contract.
 
    Before Gate 1, run a scope-control pass. The pass is allowed to delete or narrow spec
    content, acceptance criteria, architecture notes, and test strategy. It should not add new
    scope unless required to resolve a contradiction or make the change testable. Check for
    duplicated coverage of existing tests; acceptance criteria that do not map to the user
-   goal or an external contract; contradictory requirements; architectural choices that
-   increase coupling, global state, or blast radius without need; missed reuse of existing
-   patterns, helpers, fixtures, or seams; and test strategies that rely on monkey-patching
-   where ordinary dependency structure would make the code easy to test. Remove low-value
-   test strategy entries for loading config, loading static assets, or parsing static
-   fixtures unless the user-visible behavior being changed is the loader itself.
+   goal or an external contract; contradictions; unnecessary coupling, global state, or
+   blast radius; missed reuse; and test strategies that patch internals instead of using an
+   ordinary dependency seam.
 
    Revise the spec before presenting Gate 1. Mention only remaining material risks or
    tradeoffs in the Gate 1 presentation; do not include a QA report when the pass only
@@ -179,12 +174,11 @@ what GPT actually did.
    targets, import styles, reusable utilities, state boundaries, and the repo-defined
    verification commands and their order. Confirm the test command and what a meaningful
    failure looks like. Check `Research`.
-2. **Plan build** (GPT → you 1 round per critic). Prompt GPT via `build` to author a paired,
-   decision-complete build plan and write two separate files:
-   `.sdd/PLAN-tests<branch>.md` and `.sdd/PLAN-code<branch>.md`. The prompt must include the
-   approved spec, your research notes, reusable tests/fixtures, implementation targets, local
-   patterns, Architecture and Testability decisions, the exact test command, the expected
-   failure shape, and the verification loop.
+2. **Plan build.** Prompt the delegated author to return a paired, decision-complete test plan
+   and code plan using the Plan response contract. The prompt must include the complete spec,
+   your research notes, reusable tests/fixtures, implementation targets, local
+   patterns, Architecture and Testability decisions, the exact test command, and the expected
+   failure shape.
 
    Require the test plan to cover, for each case: the failure mode it catches, its level, the
    interaction seam it uses, the simplest mechanism that catches it (plain stub/mock through a
@@ -197,59 +191,55 @@ what GPT actually did.
 
    Require the code plan to cover: file-change sequence, per-file intent at the function
    level, where functionality belongs (class/module/helper/one-off), stateful vs stateless
-   structure, state scope, dependency boundaries, reuse points, coupling tradeoffs, risks, and
-   commands proving readiness. Require useful documentation for new or materially changed
-   public and major surfaces: public APIs, classes, orchestration entrypoints, complex
-   helpers, and behavior whose purpose, inputs, outputs, side effects, invariants, or error
-   behavior are not obvious from the signature and local context. Do not require docstrings
-   for trivial private helpers, simple accessors, short obvious functions, or cases where the
-   docstring would be longer than the implementation without adding maintenance value. The
-   code plan must respect the test plan's intended seams and must not require rewriting
-   approved tests around the implementation. If the spec's architecture is not testable as
+   structure, state scope, dependency boundaries, reuse points, coupling tradeoffs, risks,
+   commands proving readiness, and applicable Documentation guidance below. The code plan
+   must respect the test plan's intended seams and must not require rewriting
+   the tests around the implementation. If the spec's architecture is not testable as
    written, either plan must call that out instead of hiding it with brittle tests or
    implementation structure.
 
-   Read both plans from disk. Invoke `test-plan-critic` on the test plan with the code plan as
+   Validate the response and write both plans to their branch-scoped `.sdd` files. Invoke
+   `test-plan-critic` on the test plan with the code plan as
    context, then invoke `code-plan-critic` on the code plan with the test plan as context.
-   Have GPT fix blocking findings once if needed, scoped to the affected plan file(s). Carry
-   non-blocking findings to the gate. Check `Plan`.
-3. **GATE 2.** Present both plans plus `test-plan-critic` and `code-plan-critic`
-   non-blocking findings; approve or feedback.
-4. **Build test code** (GPT → you ≤3 rounds). Have GPT author the tests via `build`
-   (prompt = spec + approved test plan + approved code plan for seam context + planned
-   scope/files when known + test command). Instruct GPT to implement the approved test plan
-   without production behavior changes, keep changes within the planned scope, and report
-   necessary deviations. After writing tests, GPT must perform a refinement pass: remove,
-   merge, narrow, or simplify tests that are duplicative, too broad for the owned behavior,
-   setup-only, upstream-owned, or migration-only. The remaining tests should be the smallest
-   maintainable set that proves the approved owned failure modes. Then loop:
-   run the test command
+   If either critic reports blockers, translate them into required changes and run one plan
+   correction, sending the complete spec and both complete plans and persisting only a
+   validated response. Do not invoke another critic or infer a new verdict. Check `Plan`.
+3. **GATE 2.** Present both plans, the critics' original verdicts and findings, and any
+   corrected-plan diff labeled **not re-reviewed**. On feedback, require both complete
+   replacement documents through the Plan response contract, preserving an unaffected plan
+   verbatim; validate and persist them, then re-present without another AI verdict. On
+   approval, check the gate.
+4. **Build test code.** Delegate test authoring
+   (prompt = complete spec + complete test plan + complete code plan for seam context + planned
+   scope/files when known + test command). Instruct the author to implement the test
+   plan without production behavior changes, keep changes within the planned scope, and
+   report necessary deviations. Run the test command
    (deterministic check — the important new tests must **fail for the behavioral reason**,
    not infra; a premature pass is itself a blocking finding); invoke `test-critic` with the
-   spec + test files as a review round; if blocking findings remain, have GPT `fix` them
-   (diff-scoped after round 1) and repeat, up to 3 rounds. Stop early on zero blockers; at
-   the cap, escalate. Record the test command output as evidence. Check `Build test code`.
-5. **Build logic** (GPT → you ≤3 rounds). Start only after test code has zero blocking
-   `test-critic` findings and the important new tests fail for the right reason. GPT authors
-   the implementation via `build` (prompt = spec + approved code plan + approved test plan +
-   approved tests + planned scope/files when known + TASK verification commands). Instruct
-   GPT to implement the approved code plan, satisfy the approved tests, keep changes within
-   the planned scope, report necessary deviations, and avoid weakening or rewriting approved
-   tests to obtain a pass. Public and major new or materially changed classes, functions, and
-   methods must have useful docstrings where their purpose, inputs, outputs, side effects,
-   invariants, or error behavior are not obvious from the signature and local context. Use
-   the repository's docstring convention and include only sections that add maintenance
-   value; do not add boilerplate that is longer than simple code it merely restates. Then
-   loop: run every applicable command recorded under `Verification Commands` in its stated
-   order — the Build-phase tests must pass; any failing command is a blocking finding GPT
-   must fix before review. Once green, invoke `code-critic` with spec + plans + tests + impl +
-   verification output as a review round; have GPT `fix` blocking findings (diff-scoped after
-   round 1), up to 3 rounds. Stop early on zero blockers; at the cap, escalate. Check `Build
-   logic`.
+   spec + approved test plan + test files + failing-test output. If blocking findings remain,
+   delegate a correction with the complete spec, both complete plans, current failure
+   evidence, and required changes, then repeat the deterministic check and diff-scoped review,
+   up to 3 rounds. Stop early on zero blockers; at the cap, escalate. Record the test command
+   output as evidence. Check `Build test code`.
+5. **Build logic.** Start only after test code has zero blocking `test-critic` findings and
+   the important new tests fail for the right reason. Delegate the implementation
+   (prompt = complete spec + complete code plan + complete test plan + tests by path + planned scope/files when known +
+   verification commands). Instruct the author to implement the code plan, satisfy the tests,
+   keep changes within the planned scope, report necessary deviations, avoid weakening or
+   rewriting the tests to obtain a pass, and apply the Documentation guidance below. Run
+   every applicable command recorded under `Verification Commands` in its
+   stated order — the Build-phase tests must pass; any failing command must be resolved before
+   invoking `code-critic`. Once green, invoke `code-critic` with spec +
+   plans + tests + impl + verification output. If blocking findings remain, delegate a
+   correction with the complete spec, both complete plans, current verification evidence,
+   and required changes, then repeat verification and diff-scoped review, up to 3 rounds.
+   Stop early on zero blockers; at the cap, escalate. Check `Build logic`.
 6. **GATE 3.** Present the test code, logic code, failing-test evidence, green verification
-   output, and findings; approve or feedback. **Feedback loop:** GPT fixes → relevant host
-   critic reviews once (`test-critic` for test changes, `code-critic` for logic changes, both
-   if needed) → re-present; repeat until approved. On approval, the task is complete.
+   output, and findings; approve or feedback. **Feedback loop:** delegated author fixes →
+   rerun the applicable failing-test and full-verification checks → relevant host critic
+   reviews once (`test-critic` for test changes, `code-critic` for logic changes, both if
+   needed), using the same required context and current evidence → re-present; repeat until
+   approved. On approval, check the gate and complete the task.
 
 ## Documentation guidance
 
@@ -271,9 +261,9 @@ than the implementation without adding maintenance value.
 
 ## Gate presentation (every gate)
 
-Show: the artifact (or its diff), the cross-model findings split into **blocking (resolved
-this round)** and **non-blocking (for your call)**, any cap-hit escalations, and a one-line
-readiness assessment. Then ask the human to **approve** or **give feedback**, and stop.
+Show the artifact or diff, available critic findings, any cap-hit escalation, and a one-line
+readiness assessment. Never describe a correction as reviewed unless a critic actually
+reviewed it. Ask the human to **approve** or **give feedback**, and stop.
 
 ---
 
@@ -288,6 +278,7 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 - Linked issue or source request:
 - Non-goals:
 - Review Focus:
+- Delegated author: Codex
 
 ## Verification Commands
 - Test:
@@ -305,10 +296,10 @@ readiness assessment. Then ask the human to **approve** or **give feedback**, an
 
 ## 2. Build Phase
 - [ ] Research (host orchestrator, from spec)
-- [ ] Plan build (GPT author writes test + code plans -> host test-plan-critic 1x + code-plan-critic 1x -> GPT fix)
+- [ ] Plan build (delegated author returns test + code plans; host writes them)
 - [ ] GATE 2: human approves build plans
-- [ ] Build test code (GPT author -> host test-critic <=3x -> GPT fix; new tests fail for the right reason)
-- [ ] Build logic (GPT author -> host code-critic <=3x -> GPT fix; full verification, tests must pass)
+- [ ] Build test code (delegated author; new tests fail for the right reason)
+- [ ] Build logic (delegated author; full verification, tests must pass)
 - [ ] GATE 3: human approves test + logic code
 
 ## Approval Notes

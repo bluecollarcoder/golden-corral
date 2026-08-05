@@ -20,38 +20,91 @@ to work safely while keeping the human in control at a few decisive moments.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
 - **Cross-model review:** the model that authors an artifact is never the model that
-  reviews it. The host orchestrator reviews through local critic agents; GPT authors
-  plans, tests, and code through the `codex` CLI.
+  reviews it. The host orchestrator reviews through local critic agents; a delegated
+  author returns plans and edits tests and code through Codex or Cursor.
 - **Deterministic checks before critique:** run tests, linters, type checks, or builds
   before asking a model to review.
 - **Start once, stop at the gates:** the `sdd` skill drives the whole flow and pauses only
-  at the 3 human approval gates.
+  at three human approval gates:
 
-A spec here is a short feature contract stored as
-`<repo-root>/specs/<module>/<task-slug>.md` — goal, non-goals, behavior, interfaces, edge
-cases, acceptance criteria, test strategy.
+  1. Approve the specification.
+  2. Approve the paired test and code plans.
+  3. Approve the final tests and implementation.
 
 ---
 
-## One Entrypoint, Three Gates
+## Workflow Summary
 
 The workflow is the shared skill `sdd`, usable from Claude, Codex, or Cursor in this
-harness setup. It stores resumable state in `.sdd/TASK` and writes the approved spec to
-`specs/<module>/<task-slug>.md`.
+harness setup. A new task starts from a Linear issue, PRD document, or sufficiently
+detailed human instructions supplied with the skill invocation.
+
+### Files created by the workflow
+
+SDD creates two different kinds of files:
+
+- **Repository technical asset — `specs/<module>/<task-slug>.md`:** the version-controlled
+  feature contract containing the goal, non-goals, behavior, interfaces, edge cases,
+  acceptance criteria, and test strategy. It belongs to the repository alongside its code
+  and tests; it is not SDD workflow state.
+- **Local workflow records — `.sdd/`:** resumable, uncommitted scaffolding maintained by
+  the SDD orchestrator:
+
+  - `TASK-<branch>.md` records the source, gathered context, verification commands,
+    delegated-author choice, and phase checklist. Outside a git repository, its fallback
+    name is `TASK.md`.
+  - `PLAN-tests-<branch>.md` records the current complete delegated plan for test cases,
+    failure reasons, fixtures, and verification.
+  - `PLAN-code-<branch>.md` records the current complete delegated plan for production
+    changes, affected files, sequencing, and verification.
+
+Tests and production code are also repository technical assets changed during Build, not
+SDD workflow records.
+
+1. **Establish the source:** for a new task, read the supplied Linear issue or PRD document
+   or detailed human instructions as the originating problem statement; on resume, use the
+   source already recorded in TASK.
+2. **Scaffold or resume:** resolve the repository and branch, create or read the branch-scoped
+   TASK file, and continue from its first incomplete checkbox.
+3. **Research the specification:** inspect the source document, affected code, contracts,
+   dependencies, risks, existing patterns, and test seams; resolve material questions with
+   the human.
+4. **Write the specification:** the host writes the behavioral contract, acceptance criteria,
+   architecture and testability decisions, and test strategy, then narrows unnecessary scope.
+5. **Gate 1 — approve the spec:** the human approves the specification or gives feedback for
+   another host revision.
+6. **Research the build:** map acceptance criteria to failure modes, implementation targets,
+   existing tests and fixtures, dependency seams, and repository verification commands.
+7. **Create and review plans:** the delegated author returns paired test and code plans. The
+   host persists them, runs the plan critics, and requests one correction when blocking
+   findings remain.
+8. **Gate 2 — approve the plans:** the human approves both plans or requests another planning
+   pass.
+9. **Build the tests:** the delegated author writes the planned tests without production
+   changes. The host proves the important tests fail for the intended behavioral reason and
+   runs `test-critic`; blocking findings enter a correction loop of at most three rounds.
+10. **Build the logic:** after the tests have no blocking findings and fail correctly, the
+   delegated author implements the code plan. The host runs the complete verification suite
+   and `code-critic`, with another correction loop of at most three rounds.
+11. **Gate 3 — approve the build:** the human reviews the tests, implementation, deterministic
+   evidence, and remaining non-blocking findings. Feedback repeats the relevant correction and
+   critic loop until approval completes the task.
 
 The critic is always the non-author model:
 
 | Phase | Author | AI critic | Human gate |
 |-------|--------|-----------|------------|
 | Spec | host orchestrator | — | **1. Spec approved** |
-| Build plans | GPT | host `test-plan-critic` + `code-plan-critic` (1 round each) | **2. Build plans approved** |
-| Test code | GPT | host `test-critic` (≤3 rounds) | — |
-| Logic code | GPT | host `code-critic` (≤3 rounds) | **3. Build approved** |
+| Build plans | delegated author | host `test-plan-critic` + `code-plan-critic` (1 round each) | **2. Build plans approved** |
+| Test code | delegated author | host `test-critic` (≤3 rounds) | — |
+| Logic code | delegated author | host `code-critic` (≤3 rounds) | **3. Build approved** |
 
-- **Host → GPT** handoffs go through `config/lib/sdd-codex.sh` (a thin `codex exec`
-  wrapper), so the human no longer relays messages between models.
-- The host reviews GPT's plans and code with bootstrapped `test-plan-critic`,
+- Delegated author calls go through `config/lib/sdd-codex.sh` or
+  `config/lib/sdd-cursor.sh`. Codex is the default; a human instruction switches the TASK
+  to Cursor until changed again.
+- The host reviews the delegated author's plans and code with bootstrapped `test-plan-critic`,
   `code-plan-critic`, `test-critic`, and `code-critic` agents.
+
 ### Termination and cost control
 
 - Reviews return **blocking** vs **non-blocking** findings. A review loop ends the moment a
@@ -65,8 +118,49 @@ The critic is always the non-author model:
 - The final Build gate will not pass while the Build-phase tests or verification commands
   fail.
 
-At the final Build gate, human feedback runs a bounded fix loop: GPT fixes → the relevant
-host critic reviews once → back to the human, until approved.
+At the final Build gate, human feedback runs a bounded fix loop: delegated author fixes →
+the relevant host critic reviews once → back to the human, until approved.
+
+---
+
+## Installation
+
+The default Codex delegated author requires version 0.138 or newer of the
+[`codex`](https://github.com/openai/codex) CLI on `PATH` and logged in
+(`codex login status`). Then, from the repository root:
+
+```bash
+chmod +x install.sh && ./install.sh
+```
+
+It is acceptable for this personal dev tool to overwrite prior harness files. The installer
+does not manage hooks, MCP servers, plugins, backups, cleanup of deprecated files, or
+general uninstall.
+
+Selecting Cursor instead requires Linux, Bubblewrap (`bwrap`), and the Cursor CLI executable
+`agent` on `PATH` and authenticated (`agent status`). Cursor delegation fails closed when
+the process-scoped filesystem boundary cannot be established.
+
+---
+
+## Usage
+
+Run this in the target workspace from Claude, Codex, or Cursor:
+
+```text
+/sdd <Linear issue or PRD doc>	# Claude Code and Cursor
+
+$sdd <Linear issue or PRD doc>	# Codex
+```
+
+On first run it scaffolds `.sdd/TASK-<branch>.md`, asks only for missing Context or
+Verification Commands, and continues immediately when those sections are complete. From
+there it runs to the next gate and stops for your approval or feedback; re-running `/sdd`
+(even in a new session) resumes from where it left off. You will be asked to approve exactly
+three times: the spec, the paired build plans, and the final test + logic code.
+
+Each TASK records its delegated author. New and older tasks default to Codex; instruct the
+orchestrator to use Cursor to switch the current task, or to use Codex to switch it back.
 
 ---
 
@@ -85,8 +179,8 @@ Claude Code and Codex expect.
 │   │   ├── test-critic.md         # shared critic prompt bodies
 │   │   └── code-critic.md
 │   └── lib/
-│       ├── sdd-codex.sh           # codex exec wrapper (build | fix; plan-review remains available)
-│       └── findings.schema.json   # schema for the optional plan-review wrapper mode
+│       ├── sdd-codex.sh           # Codex wrapper for delegated authoring
+│       └── sdd-cursor.sh          # Cursor wrapper for delegated authoring
 ├── templates/
 │   └── PULL_REQUEST_TEMPLATE.md
 └── install.sh
@@ -102,12 +196,12 @@ Install targets:
 | Orchestrator skill | `~/.claude/skills/sdd/SKILL.md` and `~/.codex/skills/sdd/SKILL.md` |
 | Claude critic agents | `~/.claude/agents/<name>.md` |
 | Codex critic agents | `~/.codex/agents/<name>.toml` |
-| Wrapper + schema | `~/.claude/sdd/` and `~/.codex/sdd/` |
+| Wrappers | `~/.claude/sdd/` and `~/.codex/sdd/` |
 
 `.sdd/TASK-<branch>.md` (or `.sdd/TASK.md` outside a git repo) is the per-task state file.
-Add `.sdd/` to `.gitignore` — it is scaffolding, not a committed artifact. The two plan
-records `.sdd/PLAN-tests-<branch>.md` and `.sdd/PLAN-code-<branch>.md` are written for
-traceability, branch-scoped like the TASK file.
+Add `.sdd/` to `.gitignore` — it contains local workflow state, not repository technical
+assets. The orchestrator writes the two plan records `.sdd/PLAN-tests-<branch>.md` and
+`.sdd/PLAN-code-<branch>.md` from validated delegated responses for traceability.
 
 Do not add hooks, MCP servers, plugins, or extra automation until repeated manual use
 proves they are needed.
@@ -130,31 +224,54 @@ custom agent TOML.
 
 ---
 
-## Installation
+## Delegation
 
-Requires the [`codex`](https://github.com/openai/codex) CLI on `PATH` and logged in
-(`codex login status`). Then, from the repository root:
+The Codex and Cursor wrappers share one interface for plan creation, implementation, and
+corrections: `<prompt-file> [out-msg]`. Omit the output path to stream the delegated author's
+final message.
+
+### Shared context boundary
+
+Every delegated call starts fresh. The host includes the complete approved spec and, after
+planning, both complete plans inline in every implementation or correction prompt. Repository
+source and test files remain available by path. PLAN and TASK files are never loaded from
+`.sdd` by a delegate.
+
+For plan creation or correction, the delegated author returns complete test and code plans in
+two delimited response sections. The host validates those sections and writes the branch-scoped
+PLAN files. For implementation, the delegate edits repository tests or production code
+directly; only the host updates `.sdd` state.
+
+### Codex
+
+Invoke the installed Codex wrapper with:
 
 ```bash
-chmod +x install.sh && ./install.sh
+~/.codex/sdd/sdd-codex.sh .sdd/_author-prompt.md .sdd/_author-msg.md
 ```
 
-It is acceptable for this personal dev tool to overwrite prior harness files. The installer
-does not manage hooks, MCP servers, plugins, backups, cleanup of deprecated files, or
-general uninstall.
+Set `SDD_CODEX_MODEL` to request a specific model; when unset, Codex chooses its configured
+default. Each call is ephemeral and uses a permission profile that denies delegated reads and
+writes to the complete `.sdd` subtree. The wrapper opens prompt and response files on the host
+side. It intentionally does not pass `--sandbox`, because legacy sandbox settings take
+precedence over permission
+profiles. A loaded Codex configuration that sets `sandbox_mode` or
+`[sandbox_workspace_write]` is therefore incompatible with this boundary and should be
+migrated to permission profiles.
 
----
+### Cursor
 
-## Usage
+The orchestrator calls Cursor's default Agent mode through the installed wrapper. The
+prompt file may be absolute or relative to the caller; Cursor always uses the current Git
+repository root as its workspace:
 
-Run this in the target workspace from Claude, Codex, or Cursor:
-
-```text
-/sdd
+```bash
+~/.codex/sdd/sdd-cursor.sh .sdd/_author-prompt.md .sdd/_author-msg.md
 ```
 
-On first run it scaffolds `.sdd/TASK-<branch>.md` and asks you to fill in Context and
-Verification Commands, then proceeds. From there it runs to the next gate and stops for
-your approval or feedback; re-running `/sdd` (even in a new session) resumes from where it
-left off. You will be asked to approve exactly three times: the spec, the paired build
-plans, and the final test + logic code.
+Set `SDD_CURSOR_MODEL` to request a specific model; when unset, Cursor chooses its default.
+The wrapper uses Bubblewrap to give only the delegated process an empty, read-only `.sdd`, while
+interactive Cursor and other host agents retain normal access to the real directory. Cursor's
+own sandbox and unattended approval remain enabled inside that boundary. The wrapper refuses
+tracked or symlinked TASK state and supports only Cursor's default editing Agent mode, not
+`plan` or `ask` modes.

@@ -45,8 +45,8 @@ for skill_file in "$SCRIPT_DIR/config/skills/"*.md; do
     esac
 done
 
-# Cross-model wrapper + findings schema. The skill invokes the wrapper from here.
-for lib_file in "$SCRIPT_DIR/config/lib/"*; do
+# Cross-model authoring wrappers. Agents invoke the wrappers from here.
+for lib_file in "$SCRIPT_DIR/config/lib/"*.sh; do
     [ -f "$lib_file" ] || continue
     cp "$lib_file" "$CLAUDE_SDD_LIB_DIR/"
     cp "$lib_file" "$CODEX_SDD_LIB_DIR/"
@@ -54,12 +54,14 @@ for lib_file in "$SCRIPT_DIR/config/lib/"*; do
 done
 chmod +x "$CLAUDE_SDD_LIB_DIR/sdd-codex.sh"
 chmod +x "$CODEX_SDD_LIB_DIR/sdd-codex.sh"
+chmod +x "$CLAUDE_SDD_LIB_DIR/sdd-cursor.sh"
+chmod +x "$CODEX_SDD_LIB_DIR/sdd-cursor.sh"
 
-# Critic agents — host-local subagents the orchestrator uses to review GPT's plans and code.
+# Critic agents — host-local subagents that review the delegated author's plans and code.
 agent_description() {
     case "$1" in
-        test-plan-critic) printf '%s' "Reviews GPT-authored test plans for coverage, failure quality, economy, and alignment with the paired code plan." ;;
-        code-plan-critic) printf '%s' "Reviews GPT-authored implementation plans for architecture, blast radius, verification, and alignment with the paired test plan." ;;
+        test-plan-critic) printf '%s' "Reviews test plans produced by the delegated author for coverage, failure quality, economy, and alignment with the paired code plan." ;;
+        code-plan-critic) printf '%s' "Reviews implementation plans produced by the delegated author for architecture, blast radius, verification, and alignment with the paired test plan." ;;
         test-critic)      printf '%s' "Reviews tests for coverage, failure quality, mock fidelity, and missing assertions." ;;
         code-critic)      printf '%s' "Reviews implementation for correctness, security, performance, maintainability, and verification gaps." ;;
         *)                printf '%s' "Evidence-based SDD critic agent." ;;
@@ -102,6 +104,7 @@ printf "  Codex agents  : %s\n" "$CODEX_AGENTS_DIR"
 printf "  Claude SDD lib: %s\n" "$CLAUDE_SDD_LIB_DIR"
 printf "  Codex SDD lib : %s\n" "$CODEX_SDD_LIB_DIR"
 echo ""
-echo "Requires the codex CLI on PATH and logged in (codex login status)."
+echo "Codex authoring requires codex on PATH and logged in (codex login status)."
+echo "Cursor authoring requires Linux, bwrap and agent on PATH, and agent login (agent status)."
 echo "Next: run /sdd in Claude, Codex, or Cursor for the full flow."
 echo "=========================================="
