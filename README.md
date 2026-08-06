@@ -30,6 +30,9 @@ one-file changes, use the normal loop: research, edit, verify, review.
   reviewable without collapsing testing into implementation.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
+- **Agents check each other's work:** critic agents automatically review delegated plans,
+  tests, and code, returning blockers to the author for bounded fix rounds. Human gates focus
+  on output that has already gone through automated critique and correction.
 - **Cross-model delegation and review are recommended:** match the model and thinking effort
   to the task, constrain each delegate's files and context, and use a different perspective
   to catch assumptions and blind spots while making productive use of multiple subscriptions.
