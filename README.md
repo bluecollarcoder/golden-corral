@@ -239,7 +239,8 @@ custom agent TOML.
 
 The Codex and Cursor wrappers share one interface for plan creation, implementation, and
 corrections: `<prompt-file> [out-msg]`. Omit the output path to stream the delegated author's
-final message.
+final message. The orchestrator launches each wrapper through the current CLI's native
+background or asynchronous mechanism and waits for it to complete before continuing.
 
 ### Shared context boundary
 

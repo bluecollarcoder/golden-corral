@@ -98,6 +98,9 @@ persistence.
 - Codex: `<sdd-codex-wrapper> .sdd/_author-prompt<branch>.md .sdd/_author-msg<branch>.md`
 - Cursor: `<sdd-cursor-wrapper> .sdd/_author-prompt<branch>.md .sdd/_author-msg<branch>.md`
 
+Always invoke the wrapper as a background or asynchronous command through the current CLI's
+native mechanism, then wait for it to complete before continuing.
+
 The wrappers open the prompt and response files on the host side. The delegated process has
 no access to `.sdd`; do not include the TASK file, its path, critic identities, verdicts,
 rounds, or review history in a delegated prompt. When asking for corrections, translate
