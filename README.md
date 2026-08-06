@@ -1,16 +1,17 @@
 # Spec-Driven Development (SDD)
 
-A lightweight harness for using AI coding agents on major or high-risk software work. It
-keeps the work anchored to explicit artifacts — a specification, failing tests, production
-code, deterministic verification — and to a small number of human approval gates.
+A harness for long-running coding-agent sessions. It encodes spec-driven and test-driven
+development in durable process artifacts, strictly separates orchestration, authoring, and
+review responsibilities, and keeps humans in control through three approval gates.
+
+SDD runs from Claude Code, the Codex CLI, or the Cursor CLI and can coordinate different
+models. This brings independent perspectives, reduces shared blind spots, and makes better
+use of multiple coding-agent subscriptions.
 
 Use it when the cost of ambiguity is high: major features, risky refactors, data
 migrations, security-sensitive changes, public API changes, cross-system behavior, or
 long-running agent work. For small bug fixes, copy edits, mechanical refactors, or obvious
 one-file changes, use the normal loop: research, edit, verify, review.
-
-The goal is not to automate the whole SDLC. The goal is to give the agents enough structure
-to work safely while keeping the human in control at a few decisive moments.
 
 ---
 
@@ -28,8 +29,8 @@ to work safely while keeping the human in control at a few decisive moments.
   reviewable without collapsing testing into implementation.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
-- **Cross-model review:** when practical, SDD uses a different model to critique an
-  artifact than the one that authored it.
+- **Cross-model review is recommended:** a different model can catch assumptions and blind
+  spots the author missed while making productive use of multiple subscriptions.
 - **Start once, stop at the gates:** the `sdd` skill drives the whole flow and pauses only
   at three human approval gates:
 
