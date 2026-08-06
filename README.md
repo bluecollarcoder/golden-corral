@@ -5,8 +5,9 @@ development in durable process artifacts, strictly separates orchestration, auth
 review responsibilities, and keeps humans in control through three approval gates.
 
 SDD runs from Claude Code, the Codex CLI, or the Cursor CLI and can coordinate different
-models. This brings independent perspectives, reduces shared blind spots, and makes better
-use of multiple coding-agent subscriptions.
+models. This brings independent perspectives, matches model and thinking effort to the task,
+limits delegated file access and context to reduce hallucinations, and makes better use of
+multiple coding-agent subscriptions.
 
 Use it when the cost of ambiguity is high: major features, risky refactors, data
 migrations, security-sensitive changes, public API changes, cross-system behavior, or
@@ -29,8 +30,9 @@ one-file changes, use the normal loop: research, edit, verify, review.
   reviewable without collapsing testing into implementation.
 - **Tests before implementation:** write tests from the spec and verify the important new
   tests fail for the right reason before production code exists.
-- **Cross-model review is recommended:** a different model can catch assumptions and blind
-  spots the author missed while making productive use of multiple subscriptions.
+- **Cross-model delegation and review are recommended:** match the model and thinking effort
+  to the task, constrain each delegate's files and context, and use a different perspective
+  to catch assumptions and blind spots while making productive use of multiple subscriptions.
 - **Start once, stop at the gates:** the `sdd` skill drives the whole flow and pauses only
   at three human approval gates:
 

@@ -8,6 +8,7 @@ CLAUDE_SDD_LIB_DIR="$HOME/.claude/sdd"
 CODEX_SKILLS_DIR="$HOME/.codex/skills"
 CODEX_AGENTS_DIR="$HOME/.codex/agents"
 CODEX_SDD_LIB_DIR="$HOME/.codex/sdd"
+CURSOR_AGENTS_DIR="$HOME/.cursor/agents"
 
 die() {
     echo "ERROR: $1" >&2
@@ -22,7 +23,7 @@ echo "=========================================="
 [ -d "$SCRIPT_DIR/config/agents" ] || die "config/agents/ not found — run install.sh from the repository root"
 [ -d "$SCRIPT_DIR/config/lib" ] || die "config/lib/ not found — run install.sh from the repository root"
 
-mkdir -p "$CLAUDE_SKILLS_DIR" "$CLAUDE_AGENTS_DIR" "$CLAUDE_SDD_LIB_DIR" "$CODEX_SKILLS_DIR" "$CODEX_AGENTS_DIR" "$CODEX_SDD_LIB_DIR"
+mkdir -p "$CLAUDE_SKILLS_DIR" "$CLAUDE_AGENTS_DIR" "$CLAUDE_SDD_LIB_DIR" "$CODEX_SKILLS_DIR" "$CODEX_AGENTS_DIR" "$CODEX_SDD_LIB_DIR" "$CURSOR_AGENTS_DIR"
 
 # Skills. The orchestrator is shared across hosts.
 for skill_file in "$SCRIPT_DIR/config/skills/"*.md; do
@@ -91,8 +92,19 @@ for agent_file in "$SCRIPT_DIR/config/agents/"*.md; do
         printf "\n%s\n" "'''"
     } > "$CODEX_AGENTS_DIR/$agent_name.toml"
 
+    {
+        printf -- '---\n'
+        printf 'name: %s\n' "$agent_name"
+        printf 'description: %s\n' "$description"
+        printf 'model: inherit\n'
+        printf 'readonly: true\n'
+        printf -- '---\n\n'
+        cat "$agent_file"
+    } > "$CURSOR_AGENTS_DIR/$agent_name.md"
+
     echo "  claude agent: $agent_name"
     echo "  codex agent : $agent_name"
+    echo "  cursor agent: $agent_name"
 done
 
 echo ""
@@ -101,6 +113,7 @@ printf "  Claude skills : %s\n" "$CLAUDE_SKILLS_DIR"
 printf "  Claude agents : %s\n" "$CLAUDE_AGENTS_DIR"
 printf "  Codex skills  : %s\n" "$CODEX_SKILLS_DIR"
 printf "  Codex agents  : %s\n" "$CODEX_AGENTS_DIR"
+printf "  Cursor agents : %s\n" "$CURSOR_AGENTS_DIR"
 printf "  Claude SDD lib: %s\n" "$CLAUDE_SDD_LIB_DIR"
 printf "  Codex SDD lib : %s\n" "$CODEX_SDD_LIB_DIR"
 echo ""
